@@ -15,7 +15,7 @@
 
 
 rm(list=ls())
-graphics.off()
+if(!is.null(dev.list())) dev.off()
 
 
 ## 1. CHECKING AND INSTALLING REQUIRED PACKAGES ========================
@@ -35,15 +35,89 @@ if (!require("diffeR"))   install.packages("diffeR")  ;library("diffeR")
 
 
 
-## 2. LOAD WORKING MAPS ================================================= 
+## 2. FUNCTIONS ===================================================== 
+
+# input df
+to_raster <- function(df.dummy) {
+  mat.dummy             <- raster(t(matrix(df.dummy, ncol = 2359, nrow = 1152)))
+  extent(mat.dummy)     <- extent(sa4)
+  projection(mat.dummy) <- projection(lu1999)
+  return(mat.dummy)
+}
+
+# stats::predict, use lapply
+to_predict <- function (coeff, newdata.df) {
+  stats::predict(coeff, newdata = newdata.df, type = "probs", se = TRUE)
+}
+
+# to mask stacked raster according to LU1999 land classes code (lucode)
+to_mask  <- function(lumap, lucode, stack.dummy) {
+  funselect <- function(x) { x[ x !=lucode] <- NA; return(x) } #extract only non existing land use (53 hi res urb)so that existing functional land uses are not 	randomized. Set everything else to NA
+  vacants   <- calc(lumap, funselect)  
+  tp.masked <- mask( stack.dummy, vacants) #new raster with value of x, except for the cells that are NA on mask.
+  return (tp.masked)
+}
+
+# to rank using base::rank. 
+to_rank   <- function(x) {
+  rank(-x, na.last = TRUE, ties.method =  "random")
+}
+
+# to select n-th (ludemand)  cells from x -> as land use demand
+to_select <- function(x, ludemand) { 
+  x[x > ludemand] <- NA; return(x) 
+}
+
+# to run simulation. Remove commented lines #, when saving the plot is required
+to_simulate_mp <- function (lucode, tprank){
+  for (i in 1:yearLength){    
+    urbdemand1  <- urbdemand[lucode] + annualdemand[lucode]*i
+    testX       <- to_select(tprank, urbdemand1)
+    #filen       <- paste("output/20180904/lu", lucode, "_", i, ".png", sep="")	
+    
+    #png(filename = paste(filen),width = 1200, height = 1600, bg="white") 
+    plot(to_raster(testX), breaks=breakpoints,col=colors)
+    #dev.off()
+    
+    print(paste(1999 + i,  "with land demand of", urbdemand1))
+  }
+}
+
+to_count_cutOff <- function (cutOff, datamap) {
+  dataDummy <- as.data.frame(datamap)
+  z     <- dataDummy >= cutOff
+  sumZ  <- sum(z, na.rm=TRUE)
+  return (sumZ)
+}
 
 
-## 2.1 -- Set working path $ DO CHANGE THIS PATH ####
+
+to_zero_one <- function (datasetDummy) {
+  minDummy <- min(as.matrix(datasetDummy), na.rm = TRUE)
+  maxDummy <- max(as.matrix(datasetDummy), na.rm = TRUE)
+  if (minDummy < 0) {minDummy=0}
+  converted_dataset <- (datasetDummy - minDummy)/(maxDummy - minDummy)
+  return (converted_dataset)
+}
+
+to_get_mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+
+
+
+
+## 3. LOAD WORKING MAPS ================================================= 
+
+
+##__3.1 -- Set working path $ DO CHANGE THIS PATH ####
 setwd ("C:/Users/uqawahy1/Documents/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
 # setwd ("M:/Projects/koala_offsets/04 Model/CA-KoalaOffset") ## server gpem-lsec2
 
 
-## 2.2 -- Load working maps ####
+##__3.2 -- Load working maps ####
 landValue          <- raster("input/maps/seq_kpa_region.asc")
 sa4                <- raster("input/maps/seq_sa4_code11.asc")
 lu1999             <- raster("input/maps/landuse99reclsuburb4.asc")
@@ -143,80 +217,9 @@ remove(slope_dataset,
        protect_area,
        recreation_area)
 
-## 3. FUNCTIONS ===================================================== 
-
-# input df
-to_raster <- function(df.dummy) {
-  mat.dummy             <- raster(t(matrix(df.dummy, ncol = 2359, nrow = 1152)))
-  extent(mat.dummy)     <- extent(sa4)
-  projection(mat.dummy) <- projection(lu1999)
-  return(mat.dummy)
-}
-
-# stats::predict, use lapply
-to_predict <- function (coeff, newdata.df) {
-  stats::predict(coeff, newdata = newdata.df, type = "probs", se = TRUE)
-}
-
-# to mask stacked raster according to LU1999 land classes code (lucode)
-to_mask  <- function(lumap, lucode, stack.dummy) {
-  funselect <- function(x) { x[ x !=lucode] <- NA; return(x) } #extract only non existing land use (53 hi res urb)so that existing functional land uses are not 	randomized. Set everything else to NA
-  vacants   <- calc(lumap, funselect)  
-  tp.masked <- mask( stack.dummy, vacants) #new raster with value of x, except for the cells that are NA on mask.
-  return (tp.masked)
-}
-
-# to rank using base::rank. 
-to_rank   <- function(x) {
-  rank(-x, na.last = TRUE, ties.method =  "random")
-}
-
-# to select n-th (ludemand)  cells from x -> as land use demand
-to_select <- function(x, ludemand) { 
-  x[x > ludemand] <- NA; return(x) 
-}
-
-# to run simulation. Remove commented lines #, when saving the plot is required
-to_simulate_mp <- function (lucode, tprank){
-  for (i in 1:yearLength){    
-    urbdemand1  <- urbdemand[lucode] + annualdemand[lucode]*i
-    testX       <- to_select(tprank, urbdemand1)
-    #filen       <- paste("output/20180904/lu", lucode, "_", i, ".png", sep="")	
-    
-    #png(filename = paste(filen),width = 1200, height = 1600, bg="white") 
-    plot(to_raster(testX), breaks=breakpoints,col=colors)
-    #dev.off()
-    
-    print(paste(1999 + i,  "with land demand of", urbdemand1))
-  }
-}
-
-to_count_cutOff <- function (cutOff, datamap) {
-  dataDummy <- as.data.frame(datamap)
-  z     <- dataDummy >= cutOff
-  sumZ  <- sum(z, na.rm=TRUE)
-  return (sumZ)
-}
 
 
-
-to_zero_one <- function (datasetDummy) {
-  minDummy <- min(as.matrix(datasetDummy), na.rm = TRUE)
-  maxDummy <- max(as.matrix(datasetDummy), na.rm = TRUE)
-  if (minDummy < 0) {minDummy=0}
-  converted_dataset <- (datasetDummy - minDummy)/(maxDummy - minDummy)
-  return (converted_dataset)
-}
-
-to_get_mode <- function(x) {
-  ux <- unique(x)
-  ux[which.max(tabulate(match(x, ux)))]
-}
-
-
-## 4. DATA PREPARATION ===================================================== 
-
-## 4.1 -- Conversion of factors to [0 1] , stacked, and df converted ########
+## __3.3 -- Conversion of factors to [0 1] , stacked, and df converted ########
 
 stackMacroVar.df <- MacroVar 
 
@@ -271,7 +274,7 @@ stackMacroVar.df$lu2016   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.
 # plot(to_raster(stackMacroVar.df$NeighUrb))
 
 
-## 5. SAMPLING POINTS SELECTION ===================================================== 
+## 4. SAMPLING POINTS SELECTION ===================================================== 
 
 # test year 0 and 0 land demand (to imitate initial 1999 land classes)
 print("-- Sampling point selection ")

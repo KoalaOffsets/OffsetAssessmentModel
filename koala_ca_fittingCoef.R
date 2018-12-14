@@ -13,6 +13,7 @@
 
 # Remove all variables
 rm(list=ls())
+if(!is.null(dev.list())) dev.off()
 
 
 
