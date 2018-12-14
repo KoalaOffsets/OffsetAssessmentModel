@@ -142,7 +142,7 @@ to_neighUrb <- function (inputRaster, movWin_nrow, movWin_ncol) {
 
 
 ##__3.1 -- Set working path $ DO CHANGE THIS PATH ####
-setwd ("C:/Users/uqawahy1/Documents/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
+setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
 # setwd ("M:/Projects/koala_offsets/04 Model/CA-KoalaOffset") ## server gpem-lsec2
 
 
@@ -327,9 +327,9 @@ remove(test)
 
 
 
-## 3. SIMULATION ===================================================== 
+## 4. SIMULATION ===================================================== 
 
-## __3.1 -- Prepare simulation parameters ####
+## __4.1 -- Prepare simulation parameters ####
 print ('Prepare simulation parameters')
 
 red           <- c(0,198,51,0,0,255,255,255,255,255,217,166,91)
@@ -339,10 +339,10 @@ colors        <- rgb(red, green, blue, maxColorValue = 255)
 breakpoints   <- c(0,10,21,22,23,30,40,51,52,53,60,71,72,80)
 luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 
-initLU.df     <- lu1999.df$lu1999
-initYear      <- 1999
+initLU.df     <- lu2016.df$lu2016
+initYear      <- 2016
 nYearGap      <- 17 
-tSimul        <- 1  
+tSimul        <- 0  
 outputFold    <- ""
 
 # nYearGap simulation period start with initLU. finalYearLu = initLU+(nYearGap*tSimul) 
@@ -364,14 +364,14 @@ outputFold    <- ""
 
 
 
-## __3.2 -- Prepariong the transition probability (tp) -- ####
+## __4.2 -- Prepariong the transition probability (tp) -- ####
 print("-- update the transition probability according to recent LULC")
 
 
 
 for (t in 0:tSimul) {
   
-  ##____3.2.1 -- Update the tp according to initi LU-- ####
+  ##____4.2.1 -- Update the tp according to initi LU-- ####
 
   ifelse(t == 0,
          print(paste("Map of landuse ",(nYearGap*t+initYear))), 
@@ -388,7 +388,7 @@ for (t in 0:tSimul) {
   
   
   
-  ## ____3.2.2 -- Predict transition probabilities maps using stats::predict ####
+  ## ____4.2.2 -- Predict transition probabilities maps using stats::predict ####
   
   for (i in 1:13 ){
     # coefficients[[i]]$xlevels$sa4fact       <- levels(stackMacroVar.df$sa4fact)
@@ -400,7 +400,7 @@ for (t in 0:tSimul) {
   
   tp.stats   <- lapply (coefficients, to_predict, newdata.df = stackMacroVar.df)
   
-  ## ____3.2.3 -- Re-write the transition probabilities maps to corresponding LU changes ########
+  ## ____4.2.3 -- Re-write the transition probabilities maps to corresponding LU changes ########
   
   # coefficients[1] "51" "10" "21" "22" "23" "30" "40" "52" "53" "60" "71" "72" "80"
   tp.stats.10.10 <- to_raster(tp.stats[[1]][,2])
@@ -610,8 +610,9 @@ for (t in 0:tSimul) {
   tp.stats.80.80 <- to_raster(tp.stats[[13]][,10])
   
   remove(tp.stats)
+  gc()
   
-  ## ____3.2.4 -- Data frame of transition probability.  #### 
+  ## ____4.2.4 -- Data frame of transition probability.  #### 
   
   tp.cover.ls <- list()
   for (i in 1:length(luLabel)){
@@ -626,7 +627,7 @@ for (t in 0:tSimul) {
     remove(test0, test1, test2)
   }
   
-  ## ____3.2.5 -- Masking the updated tp according to current LU #### 
+  ## ____4.2.5 -- Masking the updated tp according to current LU #### 
   
   
   test <- list()
@@ -672,7 +673,7 @@ for (t in 0:tSimul) {
   
   
   
-  ## ____3.2.6 -- Cleaning tp.cover.df from NA Transition Probability #### 
+  ## ____4.2.6 -- Cleaning tp.cover.df from NA Transition Probability #### 
   tp.cover.nona.df <- tp.cover %>%
     dplyr::filter(!is.na(tp10)) %>%
     dplyr::filter(!is.na(tp21)) %>%
@@ -690,7 +691,7 @@ for (t in 0:tSimul) {
   
   
   
-  ## ____3.2.7 -- Updating TP according to the required nYearGap-- ####
+  ## ____4.2.7 -- Updating TP according to the required nYearGap-- ####
   ## Create transition probability of one at t=0 based on lu1999.
   
   ## Annual tp. Based on multiyear change-rate (modified)
@@ -707,7 +708,7 @@ for (t in 0:tSimul) {
   tp.Ratio$Sum  <- rowSums(tp.Ratio)
   test          <- tp.Ratio
   
-  ## sum tp of one. accroding to current land use
+  ## sum tp of one. according to current land use
   for (i in 1:length(luLabel) ){
     idTP          <- which(tp.cover.nona.df$luDummy == luLabel[i]) 
     idTP          <- idTP[which(!is.na(idTP))]
@@ -728,8 +729,8 @@ for (t in 0:tSimul) {
   
   
   
-  ##__3.3 -- Start simulation here#### 
-  nSimulation   <- 1     # number of simulation instances for each period (17 years)
+  ##__4.3 -- Start simulation here#### 
+  nSimulation   <- 1     # number of simulation instances for nYearGap period
   luSimulStack  <- c()
   tp.simul      <- cbind(tp.Ratio, tp.cover.nona.df[,14:17]) # transition probability used for simulation
   
@@ -750,7 +751,7 @@ for (t in 0:tSimul) {
   }
   
   
-  ##__3.4 -- Update the dynamic neighborhood urban ratio ####
+  ##__4.4 -- Update the dynamic neighborhood urban ratio ####
   
   luDummy.rs        <- to_raster(tp.cover$luDynmc)
   luDummy.nu        <- to_neighUrb(luDummy.rs, 5, 5)
@@ -784,14 +785,16 @@ for (t in 0:tSimul) {
 
 
 
-## 4. ACCURACY ASSESSMENT USING KAPPA simulation (CELL TO CELL)=================
+## 5. ACCURACY ASSESSMENT USING KAPPA simulation (CELL TO CELL)=================
 
 
-## __4.1 -- Single accuracy assessment  ####
+## __5.1 -- Single accuracy assessment  ####
 
-intialLU <- tp.cover$lu1999
+intialLU <- initLU.df
 actualLu <- tp.cover$lu2016
 simultLu <- tp.cover$luDynmc
+simultLu <- as.integer(simultLu)
+
 
 source("R_functions/kappasimulation.R")
 ctable        <- to_crosstab(actualLu, simultLu)
@@ -808,127 +811,131 @@ summary.kappa(kappa.Rositer, alpha=0.05)
 
 source("R_functions/missedHit.R")
 tp.cover$luDynmc  <- as.integer(tp.cover$luDynmc)
-sapply(tp.cover.df, class)
 
 
-tp.cover$luChange <- mutate(tp.cover, luChange = 0) %>%  
-    mutate(luChange = ifelse((lu1999 == lu2016) & (lu1999 == luDynmc) ,  11,                  # 11 Correct non-changed lu
+# For calibrating observed 1999-2016 vs simulated 1999-2016
+missedHitLU <- mutate(tp.cover, luChange = 0) %>%  
+  mutate(luChange = ifelse((lu1999 == lu2016) & (lu1999 == luDynmc) ,  11,                    # 11 Correct non-changed lu
                            ifelse((lu1999 == lu2016) & (lu1999 != luDynmc), 12,               # 12 False alarm
                                   ifelse((lu1999 != lu2016) & (lu1999 == luDynmc), 21, 22)))) # 21 Missed-hit
                                                                                               # 22 correct changes
-
-
-obs         <- to_raster(tp.cover$lu2016)
-simulation  <- to_raster(tp.cover$luChange)
-missedHit(obs, simulation)
-
+obs         <- to_raster(actualLu)
+changeLu    <- to_raster(as.integer(missedHitLU$luChange ))
+missedHit(obs, changeLu)
 
 
 
 
 
-
-## __4.2 -- Looping accuracy assessment on n simulation maps ####
-
-kappa.join = c()
-
-for (i in 1:nSimulation){
-  print(i)
-  
-  simulDummy  <- luSimulStack[[i]]
-  kappa.test  <- Kappa (obs = lu2016.df$landuse16reclsuburb4,pred = simulDummy)
-  kappa.m     <- matrix(c(kappa.test$po, 
-                          kappa.test$pe, 
-                          kappa.test$pe_max, 
-                          kappa.test$KAPPA, 
-                          kappa.test$kappa_histogram, 
-                          kappa.test$kappa_location))
-  
-  kappa.join  <- cbind(kappa.join, kappa.m)
-  
-  
-  
-}
-
-mean.kappa.join <- rowMeans(kappa.join, na.rm = FALSE, dims = 1)
-sd.kappa.join   <- apply(kappa.join,1,sd)
-  
-
-
-kappaR.user.naive.join  = c()
-kappaR.prod.naive.join  = c()
-kappaR.user.kappa.join  = c()
-kappaR.user.kvar.join   = c()
-kappaR.prod.kappa.join  = c()
-kappaR.prod.kvar.join   = c()
-
-
-for (i in 1:nSimulation){
-  print(i)
-  
-  simulDummy      <- luSimulStack[[i]]
-  crosstab16Simul <- (crosstabm(lu2016, to_raster(simulDummy)))
-  kappa16simul    <- kappa(crosstab16Simul)
-
-  kappaR.user.naive.join  = cbind(kappaR.user.naive.join, kappa16simul$user.naive)
-  kappaR.prod.naive.join  = cbind(kappaR.prod.naive.join, kappa16simul$prod.naive)
-  kappaR.user.kappa.join  = cbind(kappaR.user.kappa.join, kappa16simul$user.kappa)
-  kappaR.user.kvar.join   = cbind(kappaR.user.kvar.join,  kappa16simul$user.kvar)
-  kappaR.prod.kappa.join  = cbind(kappaR.prod.kappa.join, kappa16simul$prod.kappa)
-  kappaR.prod.kvar.join   = cbind(kappaR.prod.kvar.join,  kappa16simul$prod.kvar)
-  
-}
-
-
-
-ctable.join = c()
-simulHit  = c()
-
-for (i in 1:nSimulation){
-  print(i)
-  
-  simulDummy      <- luSimulStack[[i]]
-  
-  simulHit <- cbind(lu1999.df, lu2016.df, simulDummy)
-  names(simulHit) <- c("lu1999","lu2016", "luDynmc")
-  
-  simulHit <- simulHit %>% 
-    mutate(luChange = 0) %>% 
-    mutate(luChange = ifelse((lu1999 == lu2016) & (lu1999 == luDynmc) ,  11, 
-                             ifelse((lu1999 == lu2016) & (lu1999 != luDynmc), 12,
-                                    ifelse((lu1999 != lu2016) & (lu1999 == luDynmc), 21, 22))))
-  
-  ctable.dummy <- missedHit(obs=lu2016, simulation = to_raster(simulHit$luChange))
-  
-  test<- as.vector(t(ctable.dummy[(1:13),(1:4)]))
-  ctable.join <- cbind(ctable.join,test)
-}
-
-ctable <- rowMeans(ctable.join)
-dim(ctable) <- c(4,13)
-View(t(ctable))
-
-
-
-
-
-## 5. EXPORT MAP FOR VISUAL PRESENTATION in ArcGIS =============================
-
-
-lengthLU        <- dim(luSimulStack[[1]])[1]
-luSimulStack.df <- data.frame(matrix(unlist(luSimulStack), nrow=lengthLU, byrow=T))
-luSimulStack.df$modLU   <- apply(luSimulStack.df,1, function(x) to_get_mode(x))
+# 
+# 
+# ## __5.2 -- Looping accuracy assessment on n simulation maps ####
+# 
+# kappa.join = c()
+# 
+# for (i in 1:nSimulation){
+#   print(i)
+#   
+#   simulDummy  <- luSimulStack[[i]]
+#   kappa.test  <- Kappa (obs = lu2016.df$landuse16reclsuburb4,pred = simulDummy)
+#   kappa.m     <- matrix(c(kappa.test$po, 
+#                           kappa.test$pe, 
+#                           kappa.test$pe_max, 
+#                           kappa.test$KAPPA, 
+#                           kappa.test$kappa_histogram, 
+#                           kappa.test$kappa_location))
+#   
+#   kappa.join  <- cbind(kappa.join, kappa.m)
+#   
+#   
+#   
+# }
+# 
+# mean.kappa.join <- rowMeans(kappa.join, na.rm = FALSE, dims = 1)
+# sd.kappa.join   <- apply(kappa.join,1,sd)
+#   
+# 
+# 
+# kappaR.user.naive.join  = c()
+# kappaR.prod.naive.join  = c()
+# kappaR.user.kappa.join  = c()
+# kappaR.user.kvar.join   = c()
+# kappaR.prod.kappa.join  = c()
+# kappaR.prod.kvar.join   = c()
+# 
+# 
+# for (i in 1:nSimulation){
+#   print(i)
+#   
+#   simulDummy      <- luSimulStack[[i]]
+#   crosstab16Simul <- (crosstabm(lu2016, to_raster(simulDummy)))
+#   kappa16simul    <- kappa(crosstab16Simul)
+# 
+#   kappaR.user.naive.join  = cbind(kappaR.user.naive.join, kappa16simul$user.naive)
+#   kappaR.prod.naive.join  = cbind(kappaR.prod.naive.join, kappa16simul$prod.naive)
+#   kappaR.user.kappa.join  = cbind(kappaR.user.kappa.join, kappa16simul$user.kappa)
+#   kappaR.user.kvar.join   = cbind(kappaR.user.kvar.join,  kappa16simul$user.kvar)
+#   kappaR.prod.kappa.join  = cbind(kappaR.prod.kappa.join, kappa16simul$prod.kappa)
+#   kappaR.prod.kvar.join   = cbind(kappaR.prod.kvar.join,  kappa16simul$prod.kvar)
+#   
+# }
+# 
+# 
+# 
+# ctable.join = c()
+# simulHit  = c()
+# 
+# for (i in 1:nSimulation){
+#   print(i)
+#   
+#   simulDummy      <- luSimulStack[[i]]
+#   
+#   simulHit <- cbind(lu1999.df, lu2016.df, simulDummy)
+#   names(simulHit) <- c("lu1999","lu2016", "luDynmc")
+#   
+#   simulHit <- simulHit %>% 
+#     mutate(luChange = 0) %>% 
+#     mutate(luChange = ifelse((lu1999 == lu2016) & (lu1999 == luDynmc) ,  11, 
+#                              ifelse((lu1999 == lu2016) & (lu1999 != luDynmc), 12,
+#                                     ifelse((lu1999 != lu2016) & (lu1999 == luDynmc), 21, 22))))
+#   
+#   ctable.dummy <- missedHit(obs=lu2016, simulation = to_raster(simulHit$luChange))
+#   
+#   test<- as.vector(t(ctable.dummy[(1:13),(1:4)]))
+#   ctable.join <- cbind(ctable.join,test)
+# }
+# 
+# ctable <- rowMeans(ctable.join)
+# dim(ctable) <- c(4,13)
+# View(t(ctable))
 
 
 
 
 
-filen       <- paste("output/20181114/lu_simul_", 1999+i, ".asc", sep="")	
-writeRaster(x = to_raster(luSimulStack[[1]]), filename = paste(filen), format = "ascii", overwrite=TRUE)
+## 6. EXPORT MAP FOR VISUAL PRESENTATION =============================
+
+dateDummy <- Sys.Date()
+subDir    <- format(dateDummy, format="%Y%m%d")
+mainDir   <- "output"
+outputDir <- dir.create(file.path(getwd(), mainDir, subDir), showWarnings = FALSE)
 
 
-filen       <- paste("output/20181114/lu_simul_change.asc", sep="")	
-writeRaster(x = to_raster(simulHit$luChange), filename = paste(filen), format = "ascii", overwrite=TRUE)
-writeRaster(x = to_raster(luSimul.df$luChange), filename = paste(filen), format = "ascii", overwrite=TRUE)
+# lengthLU        <- dim(luSimulStack[[1]])[1]
+# luSimulStack.df <- data.frame(matrix(unlist(luSimulStack), nrow=lengthLU, byrow=T))
+# luSimulStack.df$modLU   <- apply(luSimulStack.df,1, function(x) to_get_mode(x))
+
+
+
+filen       <- paste( mainDir,"/", subDir , "/lu_simul_", initYear+(nYearGap*t),  sep="")
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".asc",  sep=""), format = "ascii", overwrite=TRUE)
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".tif",  sep=""), format = "GTiff", overwrite=TRUE)
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".grd",  sep=""), overwrite=TRUE)
+
+
+filen       <- paste( mainDir,"/", subDir , "/lu_simul_change_", initYear, "_", initYear+(nYearGap*t), sep="")	
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".asc",  sep=""), format = "ascii", overwrite=TRUE)
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".tif",  sep=""), format = "GTiff", overwrite=TRUE)
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".grd",  sep=""), overwrite=TRUE)
 
 
