@@ -339,10 +339,10 @@ colors        <- rgb(red, green, blue, maxColorValue = 255)
 breakpoints   <- c(0,10,21,22,23,30,40,51,52,53,60,71,72,80)
 luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 
-initLU.df     <- lu2016.df$lu2016
-initYear      <- 2016
+initLU.df     <- lu1999.df$lu1999
+initYear      <- 1999
 nYearGap      <- 17 
-tSimul        <- 0  
+tSimul        <- 1  
 outputFold    <- ""
 
 # nYearGap simulation period start with initLU. finalYearLu = initLU+(nYearGap*tSimul) 
@@ -801,12 +801,23 @@ ctable        <- to_crosstab(actualLu, simultLu)
 kappa.output  <- Kappa (ctable)
 print(kappa.output)
 
+kappa.txt <- cbind(po=kappa.output$po,
+                    pe=kappa.output$pe,
+                    pm=kappa.output$pe_max,
+                    ko=kappa.output$KAPPA,
+                    kh=kappa.output$kappa_histogram,
+                    kl=kappa.output$kappa_location)
+
 
 
 
 source("R_functions/kappa_rossiter.R")
 kappa.Rositer <- kappa(ctable)
 summary.kappa(kappa.Rositer, alpha=0.05)
+kappa.Rositer.txt <- cbind(UserNaive = kappa.Rositer$user.naive, 
+                           ProdNaive = kappa.Rositer$prod.naive,
+                           UserKappa = kappa.Rositer$user.kappa, 
+                           ProdKappa = kappa.Rositer$prod.kappa)
 
 
 source("R_functions/missedHit.R")
@@ -819,9 +830,9 @@ missedHitLU <- mutate(tp.cover, luChange = 0) %>%
                            ifelse((lu1999 == lu2016) & (lu1999 != luDynmc), 12,               # 12 False alarm
                                   ifelse((lu1999 != lu2016) & (lu1999 == luDynmc), 21, 22)))) # 21 Missed-hit
                                                                                               # 22 correct changes
-obs         <- to_raster(actualLu)
-changeLu    <- to_raster(as.integer(missedHitLU$luChange ))
-missedHit(obs, changeLu)
+obs           <- to_raster(actualLu)
+changeLu      <- to_raster(as.integer(missedHitLU$luChange ))
+missedHit.txt <- missedHit(obs, changeLu)
 
 
 
@@ -913,7 +924,7 @@ missedHit(obs, changeLu)
 
 
 
-## 6. EXPORT MAP FOR VISUAL PRESENTATION =============================
+## 6. EXPORT MAP FOR VISUAL PRESENTATION AND ACCURASY ASSESSMENT=============================
 
 dateDummy <- Sys.Date()
 subDir    <- format(dateDummy, format="%Y%m%d")
@@ -934,8 +945,16 @@ writeRaster(x = to_raster(simultLu), filename = paste(filen, ".grd",  sep=""), o
 
 
 filen       <- paste( mainDir,"/", subDir , "/lu_simul_change_", initYear, "_", initYear+(nYearGap*t), sep="")	
-writeRaster(x = to_raster(simultLu), filename = paste(filen, ".asc",  sep=""), format = "ascii", overwrite=TRUE)
-writeRaster(x = to_raster(simultLu), filename = paste(filen, ".tif",  sep=""), format = "GTiff", overwrite=TRUE)
-writeRaster(x = to_raster(simultLu), filename = paste(filen, ".grd",  sep=""), overwrite=TRUE)
+writeRaster(x = to_raster(changeLu), filename = paste(filen, ".asc",  sep=""), format = "ascii", overwrite=TRUE)
+writeRaster(x = to_raster(changeLu), filename = paste(filen, ".tif",  sep=""), format = "GTiff", overwrite=TRUE)
+writeRaster(x = to_raster(changeLu), filename = paste(filen, ".grd",  sep=""), overwrite=TRUE)
+
+
+filen       <- paste( mainDir,"/", subDir ,  "/", sep="")	
+write.csv(kappa.Rositer.txt, paste(filen, "kappa.Rositer.csv",  sep=""))
+write.csv(kappa.txt,         paste(filen, "kappa.csv",  sep=""))
+write.csv(missedHit.txt,     paste(filen, "missedHit.csv",  sep=""))
+write.csv(ctable,            paste(filen, "ctable.csv",  sep=""))
+
 
 

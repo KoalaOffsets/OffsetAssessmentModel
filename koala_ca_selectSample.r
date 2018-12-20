@@ -113,7 +113,7 @@ to_get_mode <- function(x) {
 
 
 ##__3.1 -- Set working path $ DO CHANGE THIS PATH ####
-setwd ("C:/Users/uqawahy1/Documents/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
+setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
 # setwd ("M:/Projects/koala_offsets/04 Model/CA-KoalaOffset") ## server gpem-lsec2
 
 

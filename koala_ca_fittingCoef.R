@@ -31,7 +31,7 @@ if (!require("raster"))   install.packages("raster")  ; library("raster")
 
 
 ## 2. LOAD WORKING MAPS =================== 
-setwd ("C:/Users/uqawahy1/Documents/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
+setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
 # setwd("M:/Projects/koala_offsets/02 Map/Quant_analysis")
 
 
