@@ -147,7 +147,7 @@ setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
 
 
 ##__3.2 -- Load working maps ####
-landValue          <- raster("input/maps/seq_kpa_region.asc")
+saArea             <- raster("input/maps/seq_kpa_region.asc")
 sa4                <- raster("input/maps/seq_sa4_code11.asc")
 lu1999             <- raster("input/maps/landuse99reclsuburb4.asc")
 lu2016             <- raster("input/maps/landuse16reclsuburb4.asc")
@@ -172,6 +172,7 @@ sprp_ada           <- raster( "input/maps/seq_sprp_ada.asc") # [1:KADA, 2:PKADA]
 kada_bush_uf       <- raster( "input/maps/seq_kada_bushland_outside_uf_hab_only.asc") # [2:HV Bushland, 5:LV Bushland 8:MV Bushland]
 luChange           <- raster( "input/maps/seq_lndcovch4.asc") #[first two digits:lu1999 , last two digits: lu2016]
 plan2010           <- raster( "input/maps/seq_planning_scheme_2010.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description
+plan2017           <- raster( "input/maps/seq_planning_scheme_2017b.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description
 
 
 sprp_ada       [is.na(sprp_ada) & (!is.na(lu1999))]        = 0
@@ -200,6 +201,8 @@ names(sprp_ada)         <- ("sprdpAda")
 names(kada_bush_uf)     <- ("kadaBushUF")
 names(luChange)         <- ("luChange")
 names(plan2010)         <- ("plan2010")
+names(plan2017)         <- ("plan2017")
+
 
 # Dataset non its original unit values in data frame
 MacroVar          <- as.data.frame(stack(slope_dataset,
@@ -215,14 +218,17 @@ MacroVar          <- as.data.frame(stack(slope_dataset,
                                          urbanFootprint,
                                          protect_area,
                                          recreation_area,
-                                         plan2010))
+                                         plan2010,
+                                         plan2017))
 
 # Conversion to "factor" data type on qualitative independent variables
-MacroVar$sa4fact  <- factor(MacroVar$sa4)
-MacroVar$UFfact   <- factor(MacroVar$UF)
-MacroVar$ptfact   <- factor(MacroVar$protectArea)
-MacroVar$rcfact   <- factor(MacroVar$recreArea)
+MacroVar$sa4fact      <- factor(MacroVar$sa4)
+MacroVar$UFfact       <- factor(MacroVar$UF)
+MacroVar$ptfact       <- factor(MacroVar$protectArea)
+MacroVar$rcfact       <- factor(MacroVar$recreArea)
 MacroVar$plan2010fact <- factor(MacroVar$plan2010)
+MacroVar$plan2017fact <- factor(MacroVar$plan2017)
+
 
 # Land use data in data frame type
 lu1999.df     <- as.data.frame(lu1999)
@@ -249,6 +255,7 @@ remove(slope_dataset,
        urbanFootprint,
        protect_area,
        recreation_area)
+gc()
 
 
 ## __3.3 -- Conversion of factors to [0 1] , stacked, and df converted ########
@@ -281,7 +288,9 @@ stackMacroVar.df$UF       [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.
 stackMacroVar.df$sa4fact  [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$UFfact   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$plan2010 [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
-stackMacroVar.df$plan2010fact[(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
+stackMacroVar.df$plan2017 [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
+stackMacroVar.df$plan2017fact[(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
+stackMacroVar.df$plan2017fact[(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 
 
 # hist (stackMacroVar.df$slope )
@@ -304,8 +313,8 @@ stackMacroVar.df$plan2010fact[(stackMacroVar.df$protectArea != 0) | (stackMacroV
 # plot(to_raster(stackMacroVar.df$ptchDen))
 # plot(to_raster(stackMacroVar.df$NeighUrb))
 
-	   
-	   
+
+
 ##__3.4 -- Load coefficients table ####
 coefficients = c()
 for (i in 1:13){
@@ -315,13 +324,14 @@ for (i in 1:13){
   # fileName = paste("./input/mlrsummary_plan2010/coefficient", i, ".rda", sep="")
   
   fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="")
-
+  
   load(fileName)
   coefficients [[i]] <- test
 }
 
 # lapply(coefficients, function(x) x$lev)
 remove(test)
+gc()
 
 
 
@@ -339,14 +349,20 @@ colors        <- rgb(red, green, blue, maxColorValue = 255)
 breakpoints   <- c(0,10,21,22,23,30,40,51,52,53,60,71,72,80)
 luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 
-initLU.df     <- lu1999.df$lu1999
-initYear      <- 1999
-nYearGap      <- 17 
+initLU.df     <- lu1999.df$lu1999  #lu2016.df$lu2016 
+initYear      <- 1999 # 2016   
+nYearGap      <- 17   # maximum n year gap is 17
 tSimul        <- 1  
 outputFold    <- ""
 
+luSimul.ls   <- list()
+nSimulation   <- 10     # number of simulation instances for nYearGap period
+
+
+
 # nYearGap simulation period start with initLU. finalYearLu = initLU+(nYearGap*tSimul) 
 # example. For simulation with initial LU in 1999 and we want to simulate LU in 2016, 
+# maximum nYearGap should be 17 year. This is the base on nYearGap of observed lu maps
 
 # with single simulation loop of 17 years
 # initLU.df = lu1999.df
@@ -372,7 +388,7 @@ print("-- update the transition probability according to recent LULC")
 for (t in 0:tSimul) {
   
   ##____4.2.1 -- Update the tp according to initi LU-- ####
-
+  
   ifelse(t == 0,
          print(paste("Map of landuse ",(nYearGap*t+initYear))), 
          print(paste("Simulating landuse of ",(nYearGap*t+initYear))))
@@ -384,17 +400,18 @@ for (t in 0:tSimul) {
   if (exists ("luSimul.df"))    remove (luSimul.df)
   if (exists ("tp.cover.df"))   remove (tp.cover.df)
   if (exists ("tp.cover"))      remove (tp.cover)
-  if (exists ("luSimulStack"))  remove (luSimulStack)
+  if (exists ("tp.cover.ls"))   remove (tp.cover.ls)
+  gc()
   
   
   
   ## ____4.2.2 -- Predict transition probabilities maps using stats::predict ####
   
   for (i in 1:13 ){
-    # coefficients[[i]]$xlevels$sa4fact       <- levels(stackMacroVar.df$sa4fact)
-    # coefficients[[i]]$xlevels$plan2010fact  <- levels(stackMacroVar.df$plan2010fact)
     
-    coefficients[[i]]$xlevels$UFfact  <- levels(stackMacroVar.df$UFfact)
+    coefficients[[i]]$xlevels$sa4fact       <- levels(stackMacroVar.df$sa4fact)
+    coefficients[[i]]$xlevels$plan2010fact  <- levels(stackMacroVar.df$plan2017fact)
+    coefficients[[i]]$xlevels$UFfact        <- levels(stackMacroVar.df$UFfact)
     
   }
   
@@ -625,6 +642,7 @@ for (t in 0:tSimul) {
     
     remove(list = (ls(pattern = test0)))
     remove(test0, test1, test2)
+    gc()
   }
   
   ## ____4.2.5 -- Masking the updated tp according to current LU #### 
@@ -632,7 +650,7 @@ for (t in 0:tSimul) {
   
   test <- list()
   for (i in 1:length(luLabel)){
-    print (paste("Filter and select Land-use", i))
+    print (paste("Filter and select Land-use", luLabel[i]))
     
     tpDummy.df          <- as.data.frame(tp.cover.ls[[i]])
     luDummy.df          <- as.data.frame(luDummy)
@@ -656,7 +674,6 @@ for (t in 0:tSimul) {
     test[[i]] <- tpDummy.df %>%
       mutate (orig_rank = row_number()) %>%
       filter (luDummy == luLabel[i])
-    print (i)
     
   }
   
@@ -670,6 +687,7 @@ for (t in 0:tSimul) {
   tp.cover$lu1999   <- lu1999.df$lu1999
   tp.cover$lu2016   <- lu2016.df$lu2016
   remove(test, test2, tpDummy.df, luDummy.df)
+  gc()
   
   
   
@@ -694,10 +712,11 @@ for (t in 0:tSimul) {
   ## ____4.2.7 -- Updating TP according to the required nYearGap-- ####
   ## Create transition probability of one at t=0 based on lu1999.
   
-  ## Annual tp. Based on multiyear change-rate (modified)
+  ## Annual tp. Based on multiyear change-rate (modified) "tp.ratio"
   tp.End    <- tp.cover.nona.df[,1:13] 
   nYear     <- 17
   eps       <- .Machine$double.eps^0.5 # default tolerance for small tp
+  
   
   
   ifelse ( t == 0,  
@@ -720,6 +739,7 @@ for (t in 0:tSimul) {
   test$Sum <- rowSums(test)
   tp.Ratio <- test
   remove(tp.End, test, idTP)
+  gc()
   
   
   
@@ -730,10 +750,8 @@ for (t in 0:tSimul) {
   
   
   ##__4.3 -- Start simulation here#### 
-  nSimulation   <- 1     # number of simulation instances for nYearGap period
-  luSimulStack  <- c()
   tp.simul      <- cbind(tp.Ratio, tp.cover.nona.df[,14:17]) # transition probability used for simulation
-  
+  luSimulStack  <- c() 
   
   for (i in 1:nSimulation){
     print(paste("Simulation no ", i, " of ", nSimulation, sep = ""))
@@ -746,13 +764,26 @@ for (t in 0:tSimul) {
     tp.cover<- dplyr::left_join(tp.cover, test0, by = "orig_rank")
     plot(to_raster(tp.cover$luDynmc), breaks=breakpoints,col=colors)
     title(paste("Simulation map of", t*nYearGap+initYear))
-    # luSimulStack[[i]] <- tp.cover.df$luDynmc
-    luSimulStack <- cbind(luSimulStack, tp.cover$luDynmc)
+    
+    luSimulStack <- cbind(luSimulStack, tp.cover$luDynmc) 
+    
+  }
+  
+  ## colomn bind the simulated LU map 
+  ## remove the salt and pepper using to_get_mode function
+  
+  luSimul.ls[[t+1]] <- luSimulStack
+  
+  for (i in 1:length(luSimul.ls)){
+    luSimulMode <- c()
+    luSimulMode   <- apply(luSimul.ls[[i]],1, function(x) to_get_mode(x))
   }
   
   
-  ##__4.4 -- Update the dynamic neighborhood urban ratio ####
   
+  
+  ##__4.4 -- Update the dynamic neighborhood urban ratio ####
+  tp.cover$luDynmc  <- luSimulMode
   luDummy.rs        <- to_raster(tp.cover$luDynmc)
   luDummy.nu        <- to_neighUrb(luDummy.rs, 5, 5)
   luDummy.nu.df     <- as.data.frame(luDummy.nu)
@@ -761,7 +792,7 @@ for (t in 0:tSimul) {
   stackMacroVar.df$NeighUrb <- to_zero_one(MacroVar$NeighUrb)
   stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
   
-  remove(test0)
+  remove(test0, luDummy.nu.df, luDummy.rs, luDummy.nu)
   gc() # release memory after looping and removing variables
 }
 
@@ -795,13 +826,20 @@ actualLu <- tp.cover$lu2016
 simultLu <- tp.cover$luDynmc
 simultLu <- as.integer(simultLu)
 
+intialLU[is.na(simultLu)] <- NA
+actualLu[is.na(simultLu)] <- NA
+
+
 
 source("R_functions/kappasimulation.R")
-ctable        <- to_crosstab(actualLu, simultLu)
-kappa.output  <- Kappa (ctable)
+ctable.act.sim <- to_crosstab(actualLu, simultLu)   # crosstab between actual vs simulated LU map
+ctable.int.sim <- to_crosstab(intialLU, simultLu)   # crosstab between intial vs simulated LU map
+ctable.int.act <- to_crosstab(intialLU, actualLu)   # crosstab between intial vs actual LU map
+
+kappa.output  <- Kappa (ctable.act.sim)
 print(kappa.output)
 
-kappa.txt <- cbind(po=kappa.output$po,
+kappa.txt <- cbind( po=kappa.output$po,
                     pe=kappa.output$pe,
                     pm=kappa.output$pe_max,
                     ko=kappa.output$KAPPA,
@@ -812,7 +850,7 @@ kappa.txt <- cbind(po=kappa.output$po,
 
 
 source("R_functions/kappa_rossiter.R")
-kappa.Rositer <- kappa(ctable)
+kappa.Rositer <- kappa(ctable.act.sim)
 summary.kappa(kappa.Rositer, alpha=0.05)
 kappa.Rositer.txt <- cbind(UserNaive = kappa.Rositer$user.naive, 
                            ProdNaive = kappa.Rositer$prod.naive,
@@ -829,10 +867,10 @@ missedHitLU <- mutate(tp.cover, luChange = 0) %>%
   mutate(luChange = ifelse((lu1999 == lu2016) & (lu1999 == luDynmc) ,  11,                    # 11 Correct non-changed lu
                            ifelse((lu1999 == lu2016) & (lu1999 != luDynmc), 12,               # 12 False alarm
                                   ifelse((lu1999 != lu2016) & (lu1999 == luDynmc), 21, 22)))) # 21 Missed-hit
-                                                                                              # 22 correct changes
+# 22 correct changes
 obs           <- to_raster(actualLu)
 changeLu      <- to_raster(as.integer(missedHitLU$luChange ))
-missedHit.txt <- missedHit(obs, changeLu)
+missedHit.txt <- missedHit(obs, changeLu) # assessment based on actualLU
 
 
 
@@ -954,7 +992,10 @@ filen       <- paste( mainDir,"/", subDir ,  "/", sep="")
 write.csv(kappa.Rositer.txt, paste(filen, "kappa.Rositer.csv",  sep=""))
 write.csv(kappa.txt,         paste(filen, "kappa.csv",  sep=""))
 write.csv(missedHit.txt,     paste(filen, "missedHit.csv",  sep=""))
-write.csv(ctable,            paste(filen, "ctable.csv",  sep=""))
+write.csv(ctable.act.sim,    paste(filen, "ctable.act.sim.csv",  sep=""))
+write.csv(ctable.int.sim,    paste(filen, "ctable.int.sim.csv",  sep=""))
+write.csv(ctable.int.act,    paste(filen, "ctable.int.act.csv",  sep=""))
+
 
 
 
