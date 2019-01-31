@@ -145,6 +145,7 @@ sprp_ada           <- raster( "input/maps/seq_sprp_ada.asc") # [1:KADA, 2:PKADA]
 kada_bush_uf       <- raster( "input/maps/seq_kada_bushland_outside_uf_hab_only.asc") # [2:HV Bushland, 5:LV Bushland 8:MV Bushland]
 luChange           <- raster( "input/maps/seq_lndcovch4.asc") #[first two digits:lu1999 , last two digits: lu2016]
 plan2010           <- raster( "input/maps/seq_planning_scheme_2010.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description
+plan2017           <- raster( "input/maps/seq_planning_scheme_2017b.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description
 
 
 sprp_ada       [is.na(sprp_ada) & (!is.na(lu1999))]        = 0
@@ -172,6 +173,7 @@ names(sprp_ada)         <- ("sprdpAda")
 names(kada_bush_uf)     <- ("kadaBushUF")
 names(luChange)         <- ("luChange")
 names(plan2010)         <- ("plan2010")
+names(plan2017)         <- ("plan2017")
 
 
 
@@ -190,7 +192,8 @@ MacroVar          <- as.data.frame(stack(slope_dataset,
                                          urbanFootprint,
                                          protect_area,
                                          recreation_area,
-                                         plan2010))
+                                         plan2010,
+                                         plan2017))
 
 
 lu1999.df     <- as.data.frame(lu1999)
@@ -249,6 +252,8 @@ stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.
 stackMacroVar.df$sa4      [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$UF       [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$plan2010 [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
+stackMacroVar.df$plan2017 [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
+
 
 stackMacroVar.df$lu1999   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$lu2016   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
