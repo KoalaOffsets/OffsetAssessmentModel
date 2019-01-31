@@ -71,11 +71,13 @@ for (i in 1:length(luLabel)){
   ## convert categorical data into factor, 
   
   macroVar$LCfact   <- factor(macroVar$lu2016)  
-  # macroVar$sa4fact  <- factor(macroVar$sa4) 
+  macroVar$sa4fact  <- factor(macroVar$sa4) 
   macroVar$UFfact   <- factor(macroVar$UF)
   # macroVar$ptfact   <- factor(macroVar$Protect)
   # macroVar$rcfact   <- factor(macroVar$Recre)
   macroVar$plan2010fact   <- factor(macroVar$plan2010)
+  macroVar$plan2017fact   <- factor(macroVar$plan2017)
+  
   
   # length(levels(macroVar$sa4fact ))
   # length(levels(macroVar$UFfact ))
@@ -376,22 +378,32 @@ for (i in 1:length(luLabel)){
   ##____3.5.1 ---- set up the MLR function and independent variables ####
   print("Coefficient estimates ")
   
-  test <- multinom(LCsort ~ slope + elev + road + city + roadDen + awc + cly + NeighUrb + UFfact , data = macroVar, maxit = 100)  #maximum iteration 1000
+  test <- multinom(LCsort ~ slope + 
+                     elev + 
+                     road + 
+                     city + 
+                     roadDen + 
+                     awc + 
+                     cly + 
+                     NeighUrb + 
+                     UFfact +
+                     sa4fact +
+                     plan2017fact, 
+                   data = macroVar, 
+                   maxit = 100)  #maximum iteration 1000
   
   
-  fileNametest <- paste('./input/mlrsummary_NeighUrb_UF/coefficient',i,'.rda', sep = "")
-  
-  save (test, file = fileNametest)
-  
+  fileNametest      <- paste('./input/mlrsummary_NeighUrb_UF/coefficient',i,'.rda', sep = "")
+  fileNametestcoef  <- paste('./input/mlrsummary_NeighUrb_UF/coefficient',i,'.txt', sep = "")
+  fileNametestlevel <- paste('./input/mlrsummary_NeighUrb_UF/coefficientlevel',i,'.txt', sep = "")
   
   ##____3.5.2 ---- save to txt file ####
-  
-  fileNametest <- paste('./input/mlrsummary_NeighUrb_UF/coefficient',i,'.txt', sep = "")
-  capture.output(coef(test), append = FALSE, file = fileNametest)
-  
-  
-  fileNametestlevel <- paste('./input/mlrsummary_NeighUrb_UF/coefficientlevel',i,'.txt', sep = "")
+  save (test, file = fileNametest)
+  capture.output(coef(test), append = FALSE, file = fileNametestcoef)
   capture.output(test$lev, file = fileNametestlevel)
+  
+  
+  
   print("-- end")
   
   
