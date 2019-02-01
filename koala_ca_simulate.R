@@ -401,8 +401,8 @@ for (t in 0:tSimul) {
          print(paste("Simulating landuse of ",(nYearGap*t+initYear))))
   
   ifelse ( t == 0,  
-           luDummy <- initLU.df ,   # at t=0
-           luDummy <- tp.cover$luDynmc)   # at t!=0 
+           luDummy <- initLU.df ,         # at t=0, integer
+           luDummy <- tp.cover$luDynmc)   # at t!=0, integer
   
   if (exists ("luSimul.df"))    remove (luSimul.df)
   if (exists ("tp.cover.df"))   remove (tp.cover.df)
@@ -412,48 +412,39 @@ for (t in 0:tSimul) {
   
   
   
-  ## ____4.2.2 -- Predict transition probabilities maps using stats::predict ####
+  ## ____4.2.2 -- Select sample point based on the current land use class ####
   
+  orig_rank                   <-  mutate(stackMacroVar.df, orig_rank = row_number()) #cell ID
+  stackMacroVar.df$orig_rank  <- orig_rank$orig_rank
+  stackMacroVar.df$luDummy    <- luDummy 
+  remove(orig_rank, luDummy)
+  gc()
   
-  ## Select sample points
-  orig_rank <-  mutate(stackMacroVar.df, orig_rank = row_number())
-  stackMacroVar.df$orig_rank <- orig_rank$orig_rank
-  remove(orig_rank)
-  
-  mlr_Dummy.df.ls <- list()
-  
+  mlr_Dummy.df.ls <- list()  #sample points for regression 
   for (i in 1:length(luLabel)){
     print(paste("Select sampling point ", luLabel[i]))
     
-    ifelse ( t == 0,
-             mlr_Dummy.df.ls[[i]] <- stackMacroVar.df %>% 
-               dplyr::filter(lu1999 == luLabel[i] ),
-             mlr_Dummy.df.ls[[i]] <- stackMacroVar.df %>% 
-               dplyr::filter(luDynmc == luLabel[i] ))
-    
-    
+
+    mlr_Dummy.df.ls[[i]] <- stackMacroVar.df %>% 
+      dplyr::filter(luDummy == luLabel[i] )
     
   }
   
-  #### fitting coefficient
   
-  tp.stats.ls <- list()
+  
+  
+  ##____4.2.3 -- Predict the transition probability  ####
+  
+  tp.stats.ls       <- list()
   tp.stats.names.ls <- list()
   
   for (i in 1:length(luLabel)){
     print(paste("Fitting coefficient and estimate probability of ", luLabel[i]))
     
-    
-    macroVar <- mlr_Dummy.df.ls[[i]]
-    
-    
-    print("-- multinomial fitting process ")
-    
-    
-    
-    macroVar$LCfact   <- factor(macroVar$lu2016)  
-    macroVar$sa4fact  <- factor(macroVar$sa4) 
-    macroVar$UFfact   <- factor(macroVar$UF)
+    macroVar                <- mlr_Dummy.df.ls[[i]]
+    macroVar$LCfact         <- factor(macroVar$lu2016)  
+    macroVar$sa4fact        <- factor(macroVar$sa4) 
+    macroVar$UFfact         <- factor(macroVar$UF)
     macroVar$plan2010fact   <- factor(macroVar$plan2010)
     macroVar$plan2017fact   <- factor(macroVar$plan2017)
     
@@ -476,7 +467,7 @@ for (t in 0:tSimul) {
                          na.action = na.exclude,
                          maxit = 150) 
     
-    tp.stats.ls[[i]] <- fitted(tp.dummy)
+    tp.stats.ls[[i]] <- fitted(tp.dummy) # the estimated transition probability
     tp.stats.names.ls[[i]] <- dimnames(fitted(tp.dummy))[[2]]
   }
   
@@ -485,27 +476,26 @@ for (t in 0:tSimul) {
   
   
   
-  ## ____4.2.5x -- Assigning the TP to original data frame 
+  ## ____4.2.5 -- Assigning the TP to original data frame  ####
   
-  tp.cover <- stackMacroVar.df
-  tp.names <- c( "10", "21", "22", "23", "30", "40", "51","52", "53", "60", "71", "72", "80")
+  tp.cover            <- stackMacroVar.df
+  tp.names            <- c( "10", "21", "22", "23", "30", "40", "51","52", "53", "60", "71", "72", "80")
   tp.cover[,tp.names] <- 0
   
   
   for (i in 1:13 ){
     print(paste("Assigning estimated transition probability to dataframe ", luLabel[i]))
-    indexDummy  <- which(tp.cover$lu1999 == luLabel[i])
-    dummy.df    <- tp.stats.names.ls[[i]]
-    fieldMatch   <- match(dummy.df, names(tp.cover))
-    tp.dummy  <- tp.stats.ls[[i]]
-    tp.dummy[is.na(tp.dummy)] <- 0
-    
-    tp.cover[indexDummy, fieldMatch] <- tp.dummy
+    indexDummy    <- which(tp.cover$lu1999 == luLabel[i])
+    dummy.df      <- tp.stats.names.ls[[i]]
+    fieldMatch    <- match(dummy.df, names(tp.cover))
+    tp.dummy      <- tp.stats.ls[[i]]
+    tp.dummy[is.na(tp.dummy)]         <- 0  # Remain in the same land use class
+    tp.cover[indexDummy, fieldMatch]  <- tp.dummy
   }
   
-   
   
-  ## 4.2.6x #### 
+  
+  ##____4.2.6 -- Filter transition probability 0  #### 
   
   
   tp.cover.nona.df <- tp.cover %>%
@@ -514,25 +504,18 @@ for (t in 0:tSimul) {
   
   
   
-
-  
-  
-  
-  
-  
-  ##__4.3x -- Start simulation here#### 
-  tp.simul      <- tp.cover.nona.df # transition probability used for simulation
-  luSimulStack  <- c() 
   
 
   
   
   
-  ## ____4.2.7 -- Updating TP according to the required nYearGap-- ####
+  
+  
+  ## __4.3 -- Updating TP according to the required nYearGap-- ####
   ## Create transition probability of one at t=0 based on lu1999.
   
   ## Annual tp. Based on multiyear change-rate (modified) "tp.ratio"
-  tp.End    <- tp.cover.nona.df[,1:13] 
+  tp.End    <- tp.cover.nona.df[,25:37] 
   nYear     <- 17
   eps       <- .Machine$double.eps^0.5 # default tolerance for small tp
   
@@ -565,10 +548,10 @@ for (t in 0:tSimul) {
   
   
   
- 
   
   
-  ##__4.3 -- Start simulation here#### 
+  
+  ##__4.4 -- Start simulation here#### 
   tp.simul      <- cbind(tp.Ratio, tp.cover.nona.df[,14:17]) # transition probability used for simulation
   luSimulStack  <- c() 
   
@@ -601,7 +584,7 @@ for (t in 0:tSimul) {
   
   
   
-  ##__4.4 -- Update the dynamic neighborhood urban ratio ####
+  ##__4.5 -- Update the dynamic neighborhood urban ratio ####
   tp.cover$luDynmc  <- luSimulMode
   luDummy.rs        <- to_raster(tp.cover$luDynmc)
   luDummy.nu        <- to_neighUrb(luDummy.rs, 5, 5)
