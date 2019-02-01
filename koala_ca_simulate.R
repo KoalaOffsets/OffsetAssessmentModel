@@ -50,7 +50,7 @@ to_raster <- function(df.dummy) {
 
 # stats::predict, use lapply
 to_predict <- function (coeff, newdata.df) {
-  stats::predict(coeff, newdata = newdata.df, type = "probs", se = TRUE)
+  stats::predict(coeff, newdata = newdata.df, type = "probs", se = TRUE, na.action = na.exclude)
 }
 
 # to mask stacked raster according to LU1999 land classes code (lucode)
@@ -439,7 +439,7 @@ for (t in 0:tSimul) {
   tp.stats.names.ls <- list()
   
   for (i in 1:length(luLabel)){
-    print(paste("Fitting coefficient and estimate probability of ", luLabel[i]))
+    print(paste("Estimate transition probability of ", luLabel[i]))
     
     macroVar                <- mlr_Dummy.df.ls[[i]]
     macroVar$LCfact         <- factor(macroVar$lu2016)  
@@ -452,23 +452,17 @@ for (t in 0:tSimul) {
     
     macroVar$LCsort <- relevel(macroVar$LCfact, ref = "51") # sort? kind of? reference level
     
-    tp.dummy <- multinom(LCsort ~ slope + 
-                           elev + 
-                           road + 
-                           city + 
-                           roadDen + 
-                           awc + 
-                           cly + 
-                           NeighUrb + 
-                           UFfact +
-                           sa4fact +
-                           plan2017fact, 
-                         data = macroVar,
-                         na.action = na.exclude,
-                         maxit = 150) 
+    fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="") 
     
-    tp.stats.ls[[i]] <- fitted(tp.dummy) # the estimated transition probability
-    tp.stats.names.ls[[i]] <- dimnames(fitted(tp.dummy))[[2]]
+    load(fileName) 
+    
+    tp.dummy <- to_predict(test, macroVar)
+    
+    
+
+    # tp.dummy[is.na(tp.dummy)] <- 0
+    tp.stats.ls[[i]]          <- tp.dummy # the estimated transition probability
+    tp.stats.names.ls[[i]]    <- dimnames(tp.dummy)[[2]]
   }
   
   
@@ -485,11 +479,10 @@ for (t in 0:tSimul) {
   
   for (i in 1:13 ){
     print(paste("Assigning estimated transition probability to dataframe ", luLabel[i]))
-    indexDummy    <- which(tp.cover$lu1999 == luLabel[i])
+    indexDummy    <- which(tp.cover$luDummy == luLabel[i])
     dummy.df      <- tp.stats.names.ls[[i]]
     fieldMatch    <- match(dummy.df, names(tp.cover))
     tp.dummy      <- tp.stats.ls[[i]]
-    tp.dummy[is.na(tp.dummy)]         <- 0  # Remain in the same land use class
     tp.cover[indexDummy, fieldMatch]  <- tp.dummy
   }
   
@@ -499,7 +492,7 @@ for (t in 0:tSimul) {
   
   
   tp.cover.nona.df <- tp.cover %>%
-    mutate(tpSum = rowSums(.[25:37])) %>% 
+    mutate(tpSum = rowSums(.[20:32])) %>% 
     dplyr::filter(tpSum!=0) 
   
   
@@ -515,7 +508,7 @@ for (t in 0:tSimul) {
   ## Create transition probability of one at t=0 based on lu1999.
   
   ## Annual tp. Based on multiyear change-rate (modified) "tp.ratio"
-  tp.End    <- tp.cover.nona.df[,25:37] 
+  tp.End    <- tp.cover.nona.df[,20:32] 
   nYear     <- 17
   eps       <- .Machine$double.eps^0.5 # default tolerance for small tp
   
@@ -552,20 +545,19 @@ for (t in 0:tSimul) {
   
   
   ##__4.4 -- Start simulation here#### 
-  tp.simul      <- cbind(tp.Ratio, tp.cover.nona.df[,14:17]) # transition probability used for simulation
+  tp.simul      <- cbind(tp.cover.nona.df[,1:19], tp.Ratio) # transition probability used for simulation
   luSimulStack  <- c() 
   
   for (i in 1:nSimulation){
     print(paste("Simulation no ", i, " of ", nSimulation, sep = ""))
-    tp.simul$luDynmc <- crossprod(apply(tp.simul[, c(25:37)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)
+    tp.simul$luDynmc <- crossprod(apply(tp.simul[, c(20:32)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)
     
     test0 <- tp.simul %>% 
       dplyr:: select(orig_rank,luDynmc ) 
     
     tp.cover$luDynmc <- c()
     tp.cover<- dplyr::left_join(tp.cover, test0, by = "orig_rank")
-    plot(to_raster(tp.cover$luDynmc), breaks=breakpoints,col=colors)
-    title(paste("Simulation map of", t*nYearGap+initYear , " of ", i))
+    
     
     luSimulStack <- cbind(luSimulStack, tp.cover$luDynmc) 
     
@@ -581,7 +573,8 @@ for (t in 0:tSimul) {
     luSimulMode   <- apply(luSimul.ls[[i]],1, function(x) to_get_mode(x))
   }
   
-  
+  plot(to_raster(luSimulMode), breaks=breakpoints,col=colors)
+  title(paste("Simulation map of", t*nYearGap+initYear ))
   
   
   ##__4.5 -- Update the dynamic neighborhood urban ratio ####

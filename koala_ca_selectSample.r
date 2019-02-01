@@ -175,7 +175,8 @@ names(luChange)         <- ("luChange")
 names(plan2010)         <- ("plan2010")
 names(plan2017)         <- ("plan2017")
 
-
+names(lu1999)           <- ("lu1999")
+names(lu2016)           <- ("lu2016")
 
 
 
@@ -193,7 +194,9 @@ MacroVar          <- as.data.frame(stack(slope_dataset,
                                          protect_area,
                                          recreation_area,
                                          plan2010,
-                                         plan2017))
+                                         plan2017,
+                                         lu1999,
+                                         lu2016))
 
 
 lu1999.df     <- as.data.frame(lu1999)
@@ -203,8 +206,8 @@ freq2016      <- as.data.frame(freq(lu2016))
 tp.zero       <- lu1999 - lu1999 # zero map
 
 
-MacroVar$lu1999     <- lu1999.df$landuse99reclsuburb4
-MacroVar$lu2016     <- lu2016.df$landuse16reclsuburb4
+MacroVar$lu1999     <- lu1999.df$lu1999
+MacroVar$lu2016     <- lu2016.df$lu2016
 
 remove(slope_dataset,
        elev_dataset,
@@ -289,27 +292,9 @@ luLabel <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 for (i in 1:length(luLabel)){
   print(i)
   mlr_Dummy.df <- stackMacroVar.df %>% 
-    filter(lu1999 == luLabel[i] &
-             !is.na(slope) &
-             !is.na(elev) &
-             !is.na(road) &
-             !is.na(city) &
-             !is.na(roadDen) &
-             !is.na(awc) &
-             !is.na(cly) &
-             !is.na(ptchDen) &
-             !is.na(NeighUrb) &
-             
-             !is.na(sa4) &
-             !is.na(UF) &
-             !is.na(plan2010) &
-             !is.na(protectArea) &
-             !is.na(recreArea) 
-    )
+    filter(lu1999 == luLabel[i])
   
   fileNametest <- paste('./input/mlr_201811/mlr_data',luLabel[i],'.rda', sep = "")
-  # fileNametest <- paste('./input/mlr_201811/mlr_data',i,'.rda', sep = "")
-  
   save (mlr_Dummy.df, file = fileNametest)
   
 }
