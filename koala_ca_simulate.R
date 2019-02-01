@@ -203,6 +203,9 @@ names(luChange)         <- ("luChange")
 names(plan2010)         <- ("plan2010")
 names(plan2017)         <- ("plan2017")
 
+names(lu1999)           <- ("lu1999")
+names(lu2016)           <- ("lu2016")
+
 
 # Dataset non its original unit values in data frame
 MacroVar          <- as.data.frame(stack(slope_dataset,
@@ -219,7 +222,9 @@ MacroVar          <- as.data.frame(stack(slope_dataset,
                                          protect_area,
                                          recreation_area,
                                          plan2010,
-                                         plan2017))
+                                         plan2017,
+                                         lu1999,
+                                         lu2016))
 
 # Conversion to "factor" data type on qualitative independent variables
 MacroVar$sa4fact      <- factor(MacroVar$sa4)
@@ -283,6 +288,8 @@ stackMacroVar.df$cly      [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.
 stackMacroVar.df$ptchDen  [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 
+stackMacroVar.df$lu1999   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
+stackMacroVar.df$lu2016   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$sa4      [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$UF       [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$sa4fact  [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
@@ -315,23 +322,23 @@ stackMacroVar.df$plan2017fact[(stackMacroVar.df$protectArea != 0) | (stackMacroV
 
 
 
-##__3.4 -- Load coefficients table ####
-coefficients = c()
-for (i in 1:13){
-  # fileName = paste("./input/mlrsummary_patchDens/coefficient", i, ".rda", sep="")
-  # fileName = paste("./input/mlrsummary_NeighUrb/coefficient", i, ".rda", sep="")
-  # fileName = paste("./input/mlrsummary_patchDens_NeighUrb/coefficient", i, ".rda", sep="")
-  # fileName = paste("./input/mlrsummary_plan2010/coefficient", i, ".rda", sep="")
-  
-  fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="")
-  
-  load(fileName)
-  coefficients [[i]] <- test
-}
-
-# lapply(coefficients, function(x) x$lev)
-remove(test)
-gc()
+# ##__3.4 -- Load coefficients table ####
+# coefficients = c()
+# for (i in 1:13){
+#   # fileName = paste("./input/mlrsummary_patchDens/coefficient", i, ".rda", sep="")
+#   # fileName = paste("./input/mlrsummary_NeighUrb/coefficient", i, ".rda", sep="")
+#   # fileName = paste("./input/mlrsummary_patchDens_NeighUrb/coefficient", i, ".rda", sep="")
+#   # fileName = paste("./input/mlrsummary_plan2010/coefficient", i, ".rda", sep="")
+#   
+#   fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="")
+#   
+#   load(fileName)
+#   coefficients [[i]] <- test
+# }
+# 
+# # lapply(coefficients, function(x) x$lev)
+# remove(test)
+# gc()
 
 
 
@@ -356,7 +363,7 @@ tSimul        <- 1
 outputFold    <- ""
 
 luSimul.ls   <- list()
-nSimulation   <- 10     # number of simulation instances for nYearGap period
+nSimulation   <- 100     # number of simulation instances for nYearGap period. Minimum 100
 
 
 
@@ -407,305 +414,117 @@ for (t in 0:tSimul) {
   
   ## ____4.2.2 -- Predict transition probabilities maps using stats::predict ####
   
+  
+  ## Select sample points
+  orig_rank <-  mutate(stackMacroVar.df, orig_rank = row_number())
+  stackMacroVar.df$orig_rank <- orig_rank$orig_rank
+  remove(orig_rank)
+  
+  mlr_Dummy.df.ls <- list()
+  
+  for (i in 1:length(luLabel)){
+    print(paste("Select sampling point ", luLabel[i]))
+    
+    ifelse ( t == 0,
+             mlr_Dummy.df.ls[[i]] <- stackMacroVar.df %>% 
+               dplyr::filter(lu1999 == luLabel[i] ),
+             mlr_Dummy.df.ls[[i]] <- stackMacroVar.df %>% 
+               dplyr::filter(luDynmc == luLabel[i] ))
+    
+    
+    
+  }
+  
+  #### fitting coefficient
+  
+  tp.stats.ls <- list()
+  tp.stats.names.ls <- list()
+  
+  for (i in 1:length(luLabel)){
+    print(paste("Fitting coefficient and estimate probability of ", luLabel[i]))
+    
+    
+    macroVar <- mlr_Dummy.df.ls[[i]]
+    
+    
+    print("-- multinomial fitting process ")
+    
+    
+    
+    macroVar$LCfact   <- factor(macroVar$lu2016)  
+    macroVar$sa4fact  <- factor(macroVar$sa4) 
+    macroVar$UFfact   <- factor(macroVar$UF)
+    macroVar$plan2010fact   <- factor(macroVar$plan2010)
+    macroVar$plan2017fact   <- factor(macroVar$plan2017)
+    
+    levels(macroVar$LCfact)
+    
+    macroVar$LCsort <- relevel(macroVar$LCfact, ref = "51") # sort? kind of? reference level
+    
+    tp.dummy <- multinom(LCsort ~ slope + 
+                           elev + 
+                           road + 
+                           city + 
+                           roadDen + 
+                           awc + 
+                           cly + 
+                           NeighUrb + 
+                           UFfact +
+                           sa4fact +
+                           plan2017fact, 
+                         data = macroVar,
+                         na.action = na.exclude,
+                         maxit = 150) 
+    
+    tp.stats.ls[[i]] <- fitted(tp.dummy)
+    tp.stats.names.ls[[i]] <- dimnames(fitted(tp.dummy))[[2]]
+  }
+  
+  
+  
+  
+  
+  
+  ## ____4.2.5x -- Assigning the TP to original data frame 
+  
+  tp.cover <- stackMacroVar.df
+  tp.names <- c( "10", "21", "22", "23", "30", "40", "51","52", "53", "60", "71", "72", "80")
+  tp.cover[,tp.names] <- 0
+  
+  
   for (i in 1:13 ){
+    print(paste("Assigning estimated transition probability to dataframe ", luLabel[i]))
+    indexDummy  <- which(tp.cover$lu1999 == luLabel[i])
+    dummy.df    <- tp.stats.names.ls[[i]]
+    fieldMatch   <- match(dummy.df, names(tp.cover))
+    tp.dummy  <- tp.stats.ls[[i]]
+    tp.dummy[is.na(tp.dummy)] <- 0
     
-    coefficients[[i]]$xlevels$sa4fact       <- levels(stackMacroVar.df$sa4fact)
-    coefficients[[i]]$xlevels$plan2010fact  <- levels(stackMacroVar.df$plan2017fact)
-    coefficients[[i]]$xlevels$UFfact        <- levels(stackMacroVar.df$UFfact)
-    
+    tp.cover[indexDummy, fieldMatch] <- tp.dummy
   }
   
-  tp.stats   <- lapply (coefficients, to_predict, newdata.df = stackMacroVar.df)
+   
   
-  ## ____4.2.3 -- Re-write the transition probabilities maps to corresponding LU changes ########
-  
-  # coefficients[1] "51" "10" "21" "22" "23" "30" "40" "52" "53" "60" "71" "72" "80"
-  tp.stats.10.10 <- to_raster(tp.stats[[1]][,2])
-  tp.stats.10.21 <- to_raster(tp.stats[[1]][,3])
-  tp.stats.10.22 <- to_raster(tp.stats[[1]][,4])
-  tp.stats.10.23 <- to_raster(tp.stats[[1]][,5])
-  tp.stats.10.30 <- to_raster(tp.stats[[1]][,6])
-  tp.stats.10.40 <- to_raster(tp.stats[[1]][,7])
-  tp.stats.10.51 <- to_raster(tp.stats[[1]][,1])
-  tp.stats.10.52 <- to_raster(tp.stats[[1]][,8])
-  tp.stats.10.53 <- to_raster(tp.stats[[1]][,9])
-  tp.stats.10.60 <- to_raster(tp.stats[[1]][,10])
-  tp.stats.10.71 <- to_raster(tp.stats[[1]][,11])
-  tp.stats.10.72 <- to_raster(tp.stats[[1]][,12])
-  tp.stats.10.80 <- to_raster(tp.stats[[1]][,13])
+  ## 4.2.6x #### 
   
   
-  # coefficients[2] "51" "10" "21" "22" "23" "30" "40" "52" "53" "60" "71" "72" "80"
-  tp.stats.21.10 <- to_raster(tp.stats[[2]][,2])
-  tp.stats.21.21 <- to_raster(tp.stats[[2]][,3])
-  tp.stats.21.22 <- to_raster(tp.stats[[2]][,4])
-  tp.stats.21.23 <- to_raster(tp.stats[[2]][,5])
-  tp.stats.21.30 <- to_raster(tp.stats[[2]][,6])
-  tp.stats.21.40 <- to_raster(tp.stats[[2]][,7])
-  tp.stats.21.51 <- to_raster(tp.stats[[2]][,1])
-  tp.stats.21.52 <- to_raster(tp.stats[[2]][,8])
-  tp.stats.21.53 <- to_raster(tp.stats[[2]][,9])
-  tp.stats.21.60 <- to_raster(tp.stats[[2]][,10])
-  tp.stats.21.71 <- to_raster(tp.stats[[2]][,11])
-  tp.stats.21.72 <- to_raster(tp.stats[[2]][,12])
-  tp.stats.21.80 <- to_raster(tp.stats[[2]][,13])
-  
-  
-  # coefficients[3] "51" "10" "21" "22" "23" "30" "40" "52"  "60" "71" "72" "80"
-  tp.stats.22.10 <- to_raster(tp.stats[[3]][,2])
-  tp.stats.22.21 <- to_raster(tp.stats[[3]][,3])
-  tp.stats.22.22 <- to_raster(tp.stats[[3]][,4])
-  tp.stats.22.23 <- to_raster(tp.stats[[3]][,5])
-  tp.stats.22.30 <- to_raster(tp.stats[[3]][,6])
-  tp.stats.22.40 <- to_raster(tp.stats[[3]][,7])
-  tp.stats.22.51 <- to_raster(tp.stats[[3]][,1])
-  tp.stats.22.52 <- to_raster(tp.stats[[3]][,8])
-  tp.stats.22.53 <- tp.zero
-  tp.stats.22.60 <- to_raster(tp.stats[[3]][,9])
-  tp.stats.22.71 <- to_raster(tp.stats[[3]][,10])
-  tp.stats.22.72 <- to_raster(tp.stats[[3]][,11])
-  tp.stats.22.80 <- to_raster(tp.stats[[3]][,12])
-  
-  
-  # coefficients[4]"51" "10" "21" "22" "23" "30" "40" "52" "53" "60" "71" "72" "80"
-  tp.stats.23.10 <- to_raster(tp.stats[[4]][,2])
-  tp.stats.23.21 <- to_raster(tp.stats[[4]][,3])
-  tp.stats.23.22 <- to_raster(tp.stats[[4]][,4])
-  tp.stats.23.23 <- to_raster(tp.stats[[4]][,5])
-  tp.stats.23.30 <- to_raster(tp.stats[[4]][,6])
-  tp.stats.23.40 <- to_raster(tp.stats[[4]][,7])
-  tp.stats.23.51 <- to_raster(tp.stats[[4]][,1])
-  tp.stats.23.52 <- to_raster(tp.stats[[4]][,8])
-  tp.stats.23.53 <- to_raster(tp.stats[[4]][,9])
-  tp.stats.23.60 <- to_raster(tp.stats[[4]][,10])
-  tp.stats.23.71 <- to_raster(tp.stats[[4]][,11])
-  tp.stats.23.72 <- to_raster(tp.stats[[4]][,12])
-  tp.stats.23.80 <- to_raster(tp.stats[[4]][,13])
-  
-  
-  # coefficients[5]"51" "10" "21" "22" "23" "30" "40" "52" "53" "60" "71" "72"
-  tp.stats.30.10 <- to_raster(tp.stats[[5]][,2])
-  tp.stats.30.21 <- to_raster(tp.stats[[5]][,3])
-  tp.stats.30.22 <- to_raster(tp.stats[[5]][,4])
-  tp.stats.30.23 <- to_raster(tp.stats[[5]][,5])
-  tp.stats.30.30 <- to_raster(tp.stats[[5]][,6])
-  tp.stats.30.40 <- to_raster(tp.stats[[5]][,7])
-  tp.stats.30.51 <- to_raster(tp.stats[[5]][,1])
-  tp.stats.30.52 <- to_raster(tp.stats[[5]][,8])
-  tp.stats.30.53 <- to_raster(tp.stats[[5]][,9])
-  tp.stats.30.60 <- to_raster(tp.stats[[5]][,10])
-  tp.stats.30.71 <- to_raster(tp.stats[[5]][,11])
-  tp.stats.30.72 <- to_raster(tp.stats[[5]][,12])
-  tp.stats.30.80 <- tp.zero
-  
-  
-  # coefficients[6]"51" "10" "21" "22" "23" "30" "40" "52" "53" "60" "71" "72" "80"
-  tp.stats.40.10 <- to_raster(tp.stats[[6]][,2])
-  tp.stats.40.21 <- to_raster(tp.stats[[6]][,3])
-  tp.stats.40.22 <- to_raster(tp.stats[[6]][,4])
-  tp.stats.40.23 <- to_raster(tp.stats[[6]][,5])
-  tp.stats.40.30 <- to_raster(tp.stats[[6]][,6])
-  tp.stats.40.40 <- to_raster(tp.stats[[6]][,7])
-  tp.stats.40.51 <- to_raster(tp.stats[[6]][,1])
-  tp.stats.40.52 <- to_raster(tp.stats[[6]][,8])
-  tp.stats.40.53 <- to_raster(tp.stats[[6]][,9])
-  tp.stats.40.60 <- to_raster(tp.stats[[6]][,10])
-  tp.stats.40.71 <- to_raster(tp.stats[[6]][,11])
-  tp.stats.40.72 <- to_raster(tp.stats[[6]][,12])
-  tp.stats.40.80 <- to_raster(tp.stats[[6]][,13])
-  
-  
-  # coefficients[7]"51" "10" "23" "40" "52" "53" "60" "71" "72"
-  tp.stats.51.10 <- to_raster(tp.stats[[7]][,2])
-  tp.stats.51.21 <- tp.zero
-  tp.stats.51.22 <- tp.zero
-  tp.stats.51.23 <- to_raster(tp.stats[[7]][,3])
-  tp.stats.51.30 <- tp.zero
-  tp.stats.51.40 <- to_raster(tp.stats[[7]][,4])
-  tp.stats.51.51 <- to_raster(tp.stats[[7]][,1])
-  tp.stats.51.52 <- to_raster(tp.stats[[7]][,5])
-  tp.stats.51.53 <- to_raster(tp.stats[[7]][,6])
-  tp.stats.51.60 <- to_raster(tp.stats[[7]][,7])
-  tp.stats.51.71 <- to_raster(tp.stats[[7]][,8])
-  tp.stats.51.72 <- to_raster(tp.stats[[7]][,9])
-  tp.stats.51.80 <- tp.zero
-  
-  
-  # coefficients[8] "51" "23" "52" "53" "60"
-  tp.stats.52.10 <- tp.zero
-  tp.stats.52.21 <- tp.zero
-  tp.stats.52.22 <- tp.zero
-  tp.stats.52.23 <- to_raster(tp.stats[[8]][,2])
-  tp.stats.52.30 <- tp.zero
-  tp.stats.52.40 <- tp.zero
-  tp.stats.52.51 <- to_raster(tp.stats[[8]][,1])
-  tp.stats.52.52 <- to_raster(tp.stats[[8]][,3])
-  tp.stats.52.53 <- to_raster(tp.stats[[8]][,4])
-  tp.stats.52.60 <- to_raster(tp.stats[[8]][,5])
-  tp.stats.52.71 <- tp.zero
-  tp.stats.52.72 <- tp.zero
-  tp.stats.52.80 <- tp.zero
-  
-  
-  # coefficients[9] "51" "52" "53" "60"
-  tp.stats.53.10 <- tp.zero
-  tp.stats.53.21 <- tp.zero
-  tp.stats.53.22 <- tp.zero
-  tp.stats.53.23 <- tp.zero
-  tp.stats.53.30 <- tp.zero
-  tp.stats.53.40 <- tp.zero
-  tp.stats.53.51 <- to_raster(tp.stats[[9]][,1])
-  tp.stats.53.52 <- to_raster(tp.stats[[9]][,2])
-  tp.stats.53.53 <- to_raster(tp.stats[[9]][,3])
-  tp.stats.53.60 <- to_raster(tp.stats[[9]][,4])
-  tp.stats.53.71 <- tp.zero
-  tp.stats.53.72 <- tp.zero
-  tp.stats.53.80 <- tp.zero
-  
-  
-  # coefficients[10] "51" "10" "21" "22" "23" "40" "52" "53" "60" "71" "72" "80"
-  tp.stats.60.10 <- to_raster(tp.stats[[10]][,2])
-  tp.stats.60.21 <- to_raster(tp.stats[[10]][,3])
-  tp.stats.60.22 <- to_raster(tp.stats[[10]][,4])
-  tp.stats.60.23 <- to_raster(tp.stats[[10]][,5])
-  tp.stats.60.30 <- tp.zero
-  tp.stats.60.40 <- to_raster(tp.stats[[10]][,6])
-  tp.stats.60.51 <- to_raster(tp.stats[[10]][,1])
-  tp.stats.60.52 <- to_raster(tp.stats[[10]][,7])
-  tp.stats.60.53 <- to_raster(tp.stats[[10]][,8])
-  tp.stats.60.60 <- to_raster(tp.stats[[10]][,9])
-  tp.stats.60.71 <- to_raster(tp.stats[[10]][,10])
-  tp.stats.60.72 <- to_raster(tp.stats[[10]][,11])
-  tp.stats.60.80 <- to_raster(tp.stats[[10]][,12])
-  
-  
-  # coefficients[11] "51" "10" "21" "22" "23" "40" "52" "60" "71" "72" "80"
-  tp.stats.71.10 <- to_raster(tp.stats[[11]][,2])
-  tp.stats.71.21 <- to_raster(tp.stats[[11]][,3])
-  tp.stats.71.22 <- to_raster(tp.stats[[11]][,4])
-  tp.stats.71.23 <- to_raster(tp.stats[[11]][,5])
-  tp.stats.71.30 <- tp.zero
-  tp.stats.71.40 <- to_raster(tp.stats[[11]][,6])
-  tp.stats.71.51 <- to_raster(tp.stats[[11]][,1])
-  tp.stats.71.52 <- to_raster(tp.stats[[11]][,7])
-  tp.stats.71.53 <- tp.zero
-  tp.stats.71.60 <- to_raster(tp.stats[[11]][,8])
-  tp.stats.71.71 <- to_raster(tp.stats[[11]][,9])
-  tp.stats.71.72 <- to_raster(tp.stats[[11]][,10])
-  tp.stats.71.80 <- to_raster(tp.stats[[11]][,11])
-  
-  
-  # coefficients[12] "51" "10" "21" "23" "52" "53" "60" "72"
-  tp.stats.72.10 <- to_raster(tp.stats[[12]][,2])
-  tp.stats.72.21 <- to_raster(tp.stats[[12]][,3])
-  tp.stats.72.22 <- tp.zero
-  tp.stats.72.23 <- to_raster(tp.stats[[12]][,4])
-  tp.stats.72.30 <- tp.zero
-  tp.stats.72.40 <- tp.zero
-  tp.stats.72.51 <- to_raster(tp.stats[[12]][,1])
-  tp.stats.72.52 <- to_raster(tp.stats[[12]][,5])
-  tp.stats.72.53 <- to_raster(tp.stats[[12]][,6])
-  tp.stats.72.60 <- to_raster(tp.stats[[12]][,7])
-  tp.stats.72.71 <- tp.zero
-  tp.stats.72.72 <- to_raster(tp.stats[[12]][,8])
-  tp.stats.72.80 <- tp.zero
-  
-  
-  # coefficients[13] "51" "10" "21" "22" "23" "30" "52" "60" "72" "80"
-  tp.stats.80.10 <- to_raster(tp.stats[[13]][,2])
-  tp.stats.80.21 <- to_raster(tp.stats[[13]][,3])
-  tp.stats.80.22 <- to_raster(tp.stats[[13]][,4])
-  tp.stats.80.23 <- to_raster(tp.stats[[13]][,5])
-  tp.stats.80.30 <- to_raster(tp.stats[[13]][,6])
-  tp.stats.80.40 <- tp.zero
-  tp.stats.80.51 <- to_raster(tp.stats[[13]][,1])
-  tp.stats.80.52 <- to_raster(tp.stats[[13]][,7])
-  tp.stats.80.53 <- tp.zero
-  tp.stats.80.60 <- to_raster(tp.stats[[13]][,8])
-  tp.stats.80.71 <- tp.zero
-  tp.stats.80.72 <- to_raster(tp.stats[[13]][,9])
-  tp.stats.80.80 <- to_raster(tp.stats[[13]][,10])
-  
-  remove(tp.stats)
-  gc()
-  
-  ## ____4.2.4 -- Data frame of transition probability.  #### 
-  
-  tp.cover.ls <- list()
-  for (i in 1:length(luLabel)){
-    print (paste("Masking and stacking tp.stats.", luLabel[i], sep=""))
-    
-    test0 <- paste("tp.stats.", luLabel[i], sep="")
-    test1 <- mget(ls(pattern = test0))
-    test2 <- stack(test1)
-    tp.cover.ls[[i]] <- test2
-    
-    remove(list = (ls(pattern = test0)))
-    remove(test0, test1, test2)
-    gc()
-  }
-  
-  ## ____4.2.5 -- Masking the updated tp according to current LU #### 
-  
-  
-  test <- list()
-  for (i in 1:length(luLabel)){
-    print (paste("Filter and select Land-use", luLabel[i]))
-    
-    tpDummy.df          <- as.data.frame(tp.cover.ls[[i]])
-    luDummy.df          <- as.data.frame(luDummy)
-    names(luDummy.df)   <- "layer"
-    tpDummy.df$luDummy  <- luDummy.df$layer
-    names(tpDummy.df)   <- c("tp10",
-                             "tp21",
-                             "tp22",
-                             "tp23",
-                             "tp30",
-                             "tp40",
-                             "tp51",
-                             "tp52",
-                             "tp53",
-                             "tp60",
-                             "tp71",
-                             "tp72",
-                             "tp80",
-                             "luDummy")
-    
-    test[[i]] <- tpDummy.df %>%
-      mutate (orig_rank = row_number()) %>%
-      filter (luDummy == luLabel[i])
-    
-  }
-  
-  test2 <- bind_rows(test)
-  
-  luDummy.df <- luDummy.df%>%
-    mutate (orig_rank = row_number())
-  
-  tp.cover          <- dplyr::right_join(test2,luDummy.df,  by = "orig_rank")
-  tp.cover$layer    <- c()
-  tp.cover$lu1999   <- lu1999.df$lu1999
-  tp.cover$lu2016   <- lu2016.df$lu2016
-  remove(test, test2, tpDummy.df, luDummy.df)
-  gc()
-  
-  
-  
-  ## ____4.2.6 -- Cleaning tp.cover.df from NA Transition Probability #### 
   tp.cover.nona.df <- tp.cover %>%
-    dplyr::filter(!is.na(tp10)) %>%
-    dplyr::filter(!is.na(tp21)) %>%
-    dplyr::filter(!is.na(tp22)) %>%
-    dplyr::filter(!is.na(tp23)) %>%
-    dplyr::filter(!is.na(tp30)) %>%
-    dplyr::filter(!is.na(tp40)) %>%
-    dplyr::filter(!is.na(tp51)) %>%
-    dplyr::filter(!is.na(tp52)) %>%
-    dplyr::filter(!is.na(tp53)) %>%
-    dplyr::filter(!is.na(tp60)) %>%
-    dplyr::filter(!is.na(tp71)) %>%
-    dplyr::filter(!is.na(tp72)) %>%
-    dplyr::filter(!is.na(tp80)) 
+    mutate(tpSum = rowSums(.[25:37])) %>% 
+    dplyr::filter(tpSum!=0) 
+  
+  
+  
+
+  
+  
+  
+  
+  
+  ##__4.3x -- Start simulation here#### 
+  tp.simul      <- tp.cover.nona.df # transition probability used for simulation
+  luSimulStack  <- c() 
+  
+
   
   
   
@@ -746,7 +565,7 @@ for (t in 0:tSimul) {
   
   
   
-  
+ 
   
   
   ##__4.3 -- Start simulation here#### 
@@ -755,7 +574,7 @@ for (t in 0:tSimul) {
   
   for (i in 1:nSimulation){
     print(paste("Simulation no ", i, " of ", nSimulation, sep = ""))
-    tp.simul$luDynmc <- crossprod(apply(tp.simul[, c(1:13)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)
+    tp.simul$luDynmc <- crossprod(apply(tp.simul[, c(25:37)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)
     
     test0 <- tp.simul %>% 
       dplyr:: select(orig_rank,luDynmc ) 
@@ -763,7 +582,7 @@ for (t in 0:tSimul) {
     tp.cover$luDynmc <- c()
     tp.cover<- dplyr::left_join(tp.cover, test0, by = "orig_rank")
     plot(to_raster(tp.cover$luDynmc), breaks=breakpoints,col=colors)
-    title(paste("Simulation map of", t*nYearGap+initYear))
+    title(paste("Simulation map of", t*nYearGap+initYear , " of ", i))
     
     luSimulStack <- cbind(luSimulStack, tp.cover$luDynmc) 
     
