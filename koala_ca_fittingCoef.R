@@ -1,8 +1,8 @@
-## Input: MLR_dataxx.mat from matlab
+## Input: ./input/mlr_201811/mlr_data
 ## Analysis: Multinomial logistic regression
 ## Author: Agung Wahyudi
 ## Date first created: 08/08/2018
-## Ensure you instal R.matlab
+## 
 ## Date modified:
 ## - 15/oct/2018 Adding the neighbourhood urban as independent variable
 ## - 01/Nov/2018 Adding contrainst/city council as binary independent variables (covariate)
@@ -30,7 +30,7 @@ if (!require("raster"))   install.packages("raster")  ; library("raster")
 
 
 
-## 2. LOAD WORKING MAPS =================== 
+## 2. SPECIFY WORKING FOLDER  =================== 
 setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
 # setwd("M:/Projects/koala_offsets/02 Map/Quant_analysis")
 

@@ -222,6 +222,7 @@ remove(slope_dataset,
        urbanFootprint,
        protect_area,
        recreation_area)
+gc()
 
 
 

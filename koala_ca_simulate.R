@@ -86,6 +86,7 @@ to_simulate_mp <- function (lucode, tprank){
   }
 }
 
+# to determine the cut off. Obselete, we dont use cut off with MLR method
 to_count_cutOff <- function (cutOff, datamap) {
   dataDummy <- as.data.frame(datamap)
   z     <- dataDummy >= cutOff
@@ -94,7 +95,7 @@ to_count_cutOff <- function (cutOff, datamap) {
 }
 
 
-
+# to transform original values into zero one range
 to_zero_one <- function (datasetDummy) {
   minDummy <- min(as.matrix(datasetDummy), na.rm = TRUE)
   maxDummy <- max(as.matrix(datasetDummy), na.rm = TRUE)
@@ -103,12 +104,13 @@ to_zero_one <- function (datasetDummy) {
   return (converted_dataset)
 }
 
+# to get the mode of a matrix
 to_get_mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
 
-
+# to create a cross tabulation based on two raster maps with categorical values (does not need to have similar amount of classes)
 to_crosstab <- function (obs, pred) {
   ctable <- (crosstabm( to_raster(obs), to_raster(pred)))
   View(ctable)
@@ -116,7 +118,7 @@ to_crosstab <- function (obs, pred) {
   
 }
 
-
+# to recalculate the urban neighborhood ratio (max 100) around the defined moving windows 
 to_neighUrb <- function (inputRaster, movWin_nrow, movWin_ncol) {
   
   inputLU     <- inputRaster 
@@ -322,26 +324,6 @@ stackMacroVar.df$plan2017fact[(stackMacroVar.df$protectArea != 0) | (stackMacroV
 
 
 
-# ##__3.4 -- Load coefficients table ####
-# coefficients = c()
-# for (i in 1:13){
-#   # fileName = paste("./input/mlrsummary_patchDens/coefficient", i, ".rda", sep="")
-#   # fileName = paste("./input/mlrsummary_NeighUrb/coefficient", i, ".rda", sep="")
-#   # fileName = paste("./input/mlrsummary_patchDens_NeighUrb/coefficient", i, ".rda", sep="")
-#   # fileName = paste("./input/mlrsummary_plan2010/coefficient", i, ".rda", sep="")
-#   
-#   fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="")
-#   
-#   load(fileName)
-#   coefficients [[i]] <- test
-# }
-# 
-# # lapply(coefficients, function(x) x$lev)
-# remove(test)
-# gc()
-
-
-
 
 
 ## 4. SIMULATION ===================================================== 
@@ -358,12 +340,12 @@ luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 
 initLU.df     <- lu1999.df$lu1999  #lu2016.df$lu2016 
 initYear      <- 1999 # 2016   
-nYearGap      <- 17   # maximum n year gap is 17
-tSimul        <- 1  
+nYearGap      <- 6   # maximum n year gap is 17
+tSimul        <- 3  
 outputFold    <- ""
 
-luSimul.ls   <- list()
-nSimulation   <- 100     # number of simulation instances for nYearGap period. Minimum 100
+luSimul.ls    <- list()
+nSimulation   <- 30     # number of simulation instances for nYearGap period. Minimum 30
 
 
 
@@ -414,7 +396,7 @@ for (t in 0:tSimul) {
   
   ## ____4.2.2 -- Select sample point based on the current land use class ####
   
-  orig_rank                   <-  mutate(stackMacroVar.df, orig_rank = row_number()) #cell ID
+  orig_rank                   <- mutate(stackMacroVar.df, orig_rank = row_number()) #cell ID
   stackMacroVar.df$orig_rank  <- orig_rank$orig_rank
   stackMacroVar.df$luDummy    <- luDummy 
   remove(orig_rank, luDummy)
@@ -455,14 +437,24 @@ for (t in 0:tSimul) {
     fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="") 
     
     load(fileName) 
+    # the following supresses error message when new level factor appears on sampling data. Warning: Bias
+    # test$xlevels$plan2017fact <- levels(macroVar$plan2017fact) 
+    idDummy       <- macroVar$plan2017 %in% as.numeric(test$xlevels$plan2017fact)
+    macroVar.flt  <- macroVar[idDummy,]
     
-    tp.dummy <- to_predict(test, macroVar)
+    tp.dummy <- to_predict(test, macroVar.flt)
     
     
 
     # tp.dummy[is.na(tp.dummy)] <- 0
-    tp.stats.ls[[i]]          <- tp.dummy # the estimated transition probability
-    tp.stats.names.ls[[i]]    <- dimnames(tp.dummy)[[2]]
+    
+    tp.dummy.a                  <- matrix(0, nrow= dim(macroVar)[1], ncol = length(dimnames(tp.dummy)[[2]]))
+    colnames(tp.dummy.a)        <- dimnames(tp.dummy)[[2]]
+    tp.dummy.a[idDummy,]        <- tp.dummy
+    tp.stats.ls[[i]]            <- tp.dummy.a # the estimated transition probability
+    colnames(tp.stats.ls[[i]] ) <- dimnames(tp.dummy)[[2]]
+    
+    tp.stats.names.ls[[i]]      <- dimnames(tp.dummy)[[2]]
   }
   
   
@@ -490,9 +482,11 @@ for (t in 0:tSimul) {
   
   ##____4.2.6 -- Filter transition probability 0  #### 
   
+  id10 = which(names(tp.cover)=="10")
+  id80 = which(names(tp.cover)=="80")
   
   tp.cover.nona.df <- tp.cover %>%
-    mutate(tpSum = rowSums(.[20:32])) %>% 
+    mutate(tpSum = rowSums(.[id10:id80])) %>% 
     dplyr::filter(tpSum!=0) 
   
   
@@ -508,7 +502,7 @@ for (t in 0:tSimul) {
   ## Create transition probability of one at t=0 based on lu1999.
   
   ## Annual tp. Based on multiyear change-rate (modified) "tp.ratio"
-  tp.End    <- tp.cover.nona.df[,20:32] 
+  tp.End    <- tp.cover.nona.df[,id10:id80] 
   nYear     <- 17
   eps       <- .Machine$double.eps^0.5 # default tolerance for small tp
   
@@ -545,12 +539,16 @@ for (t in 0:tSimul) {
   
   
   ##__4.4 -- Start simulation here#### 
-  tp.simul      <- cbind(tp.cover.nona.df[,1:19], tp.Ratio) # transition probability used for simulation
+  tp.simul      <- cbind(tp.cover.nona.df[,1:id10-1], tp.Ratio) # transition probability used for simulation
   luSimulStack  <- c() 
   
-  for (i in 1:nSimulation){
-    print(paste("Simulation no ", i, " of ", nSimulation, sep = ""))
-    tp.simul$luDynmc <- crossprod(apply(tp.simul[, c(20:32)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)
+  ifelse ( t == 0,  
+           nSimulationDummy <- 1 ,          # at t=0, no need to repeat simulation instances 
+           nSimulationDummy <- nSimulation) 
+  
+  for (i in 1:nSimulationDummy){
+    print(paste("Simulation no ", i, " of ", nSimulationDummy, sep = ""))
+    tp.simul$luDynmc <- crossprod(apply(tp.simul[, c(id10:id80)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)
     
     test0 <- tp.simul %>% 
       dplyr:: select(orig_rank,luDynmc ) 
@@ -568,10 +566,9 @@ for (t in 0:tSimul) {
   
   luSimul.ls[[t+1]] <- luSimulStack
   
-  for (i in 1:length(luSimul.ls)){
-    luSimulMode <- c()
-    luSimulMode   <- apply(luSimul.ls[[i]],1, function(x) to_get_mode(x))
-  }
+  ifelse ( t == 0,  
+           luSimulMode   <- as.numeric(tp.cover$luDynmc) ,          # at t=0, no need to repeat simulation instances 
+           luSimulMode   <- apply(luSimulStack,1, function(x) to_get_mode(x)) )
   
   plot(to_raster(luSimulMode), breaks=breakpoints,col=colors)
   title(paste("Simulation map of", t*nYearGap+initYear ))
@@ -614,7 +611,7 @@ for (t in 0:tSimul) {
 ## 5. ACCURACY ASSESSMENT USING KAPPA simulation (CELL TO CELL)=================
 
 
-## __5.1 -- Single accuracy assessment  ####
+## __5.1 -- Kappa index  ####
 
 intialLU <- initLU.df
 actualLu <- tp.cover$lu2016
@@ -623,6 +620,8 @@ simultLu <- as.integer(simultLu)
 
 intialLU[is.na(simultLu)] <- NA
 actualLu[is.na(simultLu)] <- NA
+
+# plot(stack(to_raster(actualLu), to_raster(simultLu)), breaks=breakpoints,col=colors)
 
 
 
@@ -653,6 +652,7 @@ kappa.Rositer.txt <- cbind(UserNaive = kappa.Rositer$user.naive,
                            ProdKappa = kappa.Rositer$prod.kappa)
 
 
+## __5.2 -- Missed-hit accuracy assessment  ####
 source("R_functions/missedHit.R")
 tp.cover$luDynmc  <- as.integer(tp.cover$luDynmc)
 
@@ -670,88 +670,6 @@ missedHit.txt <- missedHit(obs, changeLu) # assessment based on actualLU
 
 
 
-
-# 
-# 
-# ## __5.2 -- Looping accuracy assessment on n simulation maps ####
-# 
-# kappa.join = c()
-# 
-# for (i in 1:nSimulation){
-#   print(i)
-#   
-#   simulDummy  <- luSimulStack[[i]]
-#   kappa.test  <- Kappa (obs = lu2016.df$landuse16reclsuburb4,pred = simulDummy)
-#   kappa.m     <- matrix(c(kappa.test$po, 
-#                           kappa.test$pe, 
-#                           kappa.test$pe_max, 
-#                           kappa.test$KAPPA, 
-#                           kappa.test$kappa_histogram, 
-#                           kappa.test$kappa_location))
-#   
-#   kappa.join  <- cbind(kappa.join, kappa.m)
-#   
-#   
-#   
-# }
-# 
-# mean.kappa.join <- rowMeans(kappa.join, na.rm = FALSE, dims = 1)
-# sd.kappa.join   <- apply(kappa.join,1,sd)
-#   
-# 
-# 
-# kappaR.user.naive.join  = c()
-# kappaR.prod.naive.join  = c()
-# kappaR.user.kappa.join  = c()
-# kappaR.user.kvar.join   = c()
-# kappaR.prod.kappa.join  = c()
-# kappaR.prod.kvar.join   = c()
-# 
-# 
-# for (i in 1:nSimulation){
-#   print(i)
-#   
-#   simulDummy      <- luSimulStack[[i]]
-#   crosstab16Simul <- (crosstabm(lu2016, to_raster(simulDummy)))
-#   kappa16simul    <- kappa(crosstab16Simul)
-# 
-#   kappaR.user.naive.join  = cbind(kappaR.user.naive.join, kappa16simul$user.naive)
-#   kappaR.prod.naive.join  = cbind(kappaR.prod.naive.join, kappa16simul$prod.naive)
-#   kappaR.user.kappa.join  = cbind(kappaR.user.kappa.join, kappa16simul$user.kappa)
-#   kappaR.user.kvar.join   = cbind(kappaR.user.kvar.join,  kappa16simul$user.kvar)
-#   kappaR.prod.kappa.join  = cbind(kappaR.prod.kappa.join, kappa16simul$prod.kappa)
-#   kappaR.prod.kvar.join   = cbind(kappaR.prod.kvar.join,  kappa16simul$prod.kvar)
-#   
-# }
-# 
-# 
-# 
-# ctable.join = c()
-# simulHit  = c()
-# 
-# for (i in 1:nSimulation){
-#   print(i)
-#   
-#   simulDummy      <- luSimulStack[[i]]
-#   
-#   simulHit <- cbind(lu1999.df, lu2016.df, simulDummy)
-#   names(simulHit) <- c("lu1999","lu2016", "luDynmc")
-#   
-#   simulHit <- simulHit %>% 
-#     mutate(luChange = 0) %>% 
-#     mutate(luChange = ifelse((lu1999 == lu2016) & (lu1999 == luDynmc) ,  11, 
-#                              ifelse((lu1999 == lu2016) & (lu1999 != luDynmc), 12,
-#                                     ifelse((lu1999 != lu2016) & (lu1999 == luDynmc), 21, 22))))
-#   
-#   ctable.dummy <- missedHit(obs=lu2016, simulation = to_raster(simulHit$luChange))
-#   
-#   test<- as.vector(t(ctable.dummy[(1:13),(1:4)]))
-#   ctable.join <- cbind(ctable.join,test)
-# }
-# 
-# ctable <- rowMeans(ctable.join)
-# dim(ctable) <- c(4,13)
-# View(t(ctable))
 
 
 
