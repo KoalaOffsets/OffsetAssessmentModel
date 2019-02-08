@@ -151,6 +151,7 @@ setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
 ##__3.2 -- Load working maps ####
 saArea             <- raster("input/maps/seq_kpa_region.asc")
 sa4                <- raster("input/maps/seq_sa4_code11.asc")
+lga                <- raster("input/maps/seq_lga.asc")
 lu1999             <- raster("input/maps/landuse99reclsuburb4.asc")
 lu2016             <- raster("input/maps/landuse16reclsuburb4.asc")
 
@@ -369,7 +370,7 @@ nSimulation   <- 30     # number of simulation instances for nYearGap period. Mi
 
 
 
-## __4.2 -- Prepariong the transition probability (tp) -- ####
+## __4.2 -- Preparing the transition probability (tp) -- ####
 print("-- update the transition probability according to recent LULC")
 
 
@@ -462,7 +463,7 @@ for (t in 0:tSimul) {
   
   
   
-  ## ____4.2.5 -- Assigning the TP to original data frame  ####
+  ## ____4.2.4 -- Assigning the TP to original data frame  ####
   
   tp.cover            <- stackMacroVar.df
   tp.names            <- c( "10", "21", "22", "23", "30", "40", "51","52", "53", "60", "71", "72", "80")
@@ -480,7 +481,7 @@ for (t in 0:tSimul) {
   
   
   
-  ##____4.2.6 -- Filter transition probability 0  #### 
+  ##____4.2.5 -- Filter transition probability 0  #### 
   
   id10 = which(names(tp.cover)=="10")
   id80 = which(names(tp.cover)=="80")
