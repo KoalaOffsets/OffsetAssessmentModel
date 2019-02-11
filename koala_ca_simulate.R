@@ -347,6 +347,7 @@ outputFold    <- ""
 
 luSimul.ls    <- list()
 nSimulation   <- 30     # number of simulation instances for nYearGap period. Minimum 30
+freqLU        <- freq(to_raster(initLU.df))
 
 
 
@@ -585,6 +586,8 @@ for (t in 0:tSimul) {
   stackMacroVar.df$NeighUrb <- to_zero_one(MacroVar$NeighUrb)
   stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
   
+  freqLU <- cbind(freqLU, freq(to_raster(tp.cover$luDynmc))[,2])
+  
   remove(test0, luDummy.nu.df, luDummy.rs, luDummy.nu)
   gc() # release memory after looping and removing variables
 }
@@ -709,6 +712,7 @@ write.csv(missedHit.txt,     paste(filen, "missedHit.csv",  sep=""))
 write.csv(ctable.act.sim,    paste(filen, "ctable.act.sim.csv",  sep=""))
 write.csv(ctable.int.sim,    paste(filen, "ctable.int.sim.csv",  sep=""))
 write.csv(ctable.int.act,    paste(filen, "ctable.int.act.csv",  sep=""))
+write.csv(freqLU,            paste(filen, "freqLU.csv",  sep=""))
 
 
 

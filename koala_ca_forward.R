@@ -291,8 +291,6 @@ stackMacroVar.df$cly      [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.
 stackMacroVar.df$ptchDen  [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 
-# stackMacroVar.df$lu1999   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
-# stackMacroVar.df$lu2016   [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$sa4      [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$UF       [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
 stackMacroVar.df$sa4fact  [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
@@ -341,12 +339,13 @@ luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 
 initLU.df     <- lu2016.df$lu2016 
 initYear      <- 2016   
-nYearGap      <- 5
-tSimul        <- 3  
+nYearGap      <- 17
+tSimul        <- 1  
 outputFold    <- ""
 
 luSimul.ls    <- list()
 nSimulation   <- 30     # number of simulation instances for nYearGap period. Minimum 30
+freqLU        <- freq(to_raster(initLU.df))
 
 
 
@@ -480,7 +479,7 @@ for (t in 0:tSimul) {
   
   
   
-  ##____4.2.5 -- Filter transition probability 0, return to original land class  #### 
+  ##____4.2.5 -- Filter transition probability 0, return to original land class CONSTRAINTS  #### 
   
   id10 = which(names(tp.cover)=="10")
   id80 = which(names(tp.cover)=="80")
@@ -488,10 +487,11 @@ for (t in 0:tSimul) {
   sumTP         <- rowSums(tp.cover[, id10:id80])
   
   for (i in 1:length(luLabel) ){
-    idTP          <- which(tp.cover$luDummy == luLabel[i] & sumTP==0)
+    idTP          <- which(tp.cover$luDummy == luLabel[i] & sumTP== 0)
     tp.cover[idTP,id10+i-1]  <- 1
+
     
-    idTP          <- which(tp.cover$luDummy == luLabel[i] & is.na(tp.cover[,id10]))
+    idTP          <- which(tp.cover$luDummy == luLabel[i] & is.na(sumTP))
     tp.cover[idTP,c(id10:id80)]  <- 0
     
     tp.cover[idTP,id10+i-1]  <- 1
@@ -597,9 +597,53 @@ for (t in 0:tSimul) {
   stackMacroVar.df$NeighUrb <- to_zero_one(MacroVar$NeighUrb)
   # stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
   
+  freqLU <- cbind(freqLU, freq(to_raster(tp.cover$luDynmc))[,2])
+  
   remove(test0, luDummy.nu.df, luDummy.rs, luDummy.nu)
   gc() # release memory after looping and removing variables
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 6. EXPORT MAP FOR VISUAL PRESENTATION AND ACCURASY ASSESSMENT=============================
+
+simultLu <- tp.cover$luDynmc
+simultLu <- as.integer(simultLu)
+
+
+
+dateDummy <- Sys.Date()
+subDir    <- format(dateDummy, format="%Y%m%d")
+mainDir   <- "output"
+outputDir <- dir.create(file.path(getwd(), mainDir, subDir), showWarnings = FALSE)
+
+
+# lengthLU        <- dim(luSimulStack[[1]])[1]
+# luSimulStack.df <- data.frame(matrix(unlist(luSimulStack), nrow=lengthLU, byrow=T))
+# luSimulStack.df$modLU   <- apply(luSimulStack.df,1, function(x) to_get_mode(x))
+
+
+
+filen       <- paste( mainDir,"/", subDir , "/lu_simul_", initYear+(nYearGap*t),  sep="")
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".asc",  sep=""), format = "ascii", overwrite=TRUE)
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".tif",  sep=""), format = "GTiff", overwrite=TRUE)
+writeRaster(x = to_raster(simultLu), filename = paste(filen, ".grd",  sep=""), overwrite=TRUE)
+
+
+filen       <- paste( mainDir,"/", subDir ,  "/", sep="")	
+write.csv(freqLU, paste(filen, "freqLU.csv",  sep=""))
 
 
 
