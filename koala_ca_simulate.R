@@ -33,6 +33,9 @@ if (!require("RNetLogo")) install.packages("RNetLogo"); library("RNetLogo")
 if (!require("nnet"))     install.packages("nnet")    ; library("nnet")
 if (!require("grDevices"))install.packages("grDevices");library("grDevices")
 if (!require("diffeR"))   install.packages("diffeR")  ;library("diffeR")
+if (!require("parallel")) install.packages("parallel");library("parallel")
+
+
 
 
 
@@ -341,8 +344,8 @@ luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 
 initLU.df     <- lu1999.df$lu1999  #lu2016.df$lu2016 
 initYear      <- 1999 # 2016   
-nYearGap      <- 6   # maximum n year gap is 17
-tSimul        <- 3  
+nYearGap      <- 17   # maximum n year gap is 17
+tSimul        <- 1  
 outputFold    <- ""
 
 luSimul.ls    <- list()
@@ -433,27 +436,15 @@ for (t in 0:tSimul) {
     macroVar$plan2017fact   <- factor(macroVar$plan2017)
     
     levels(macroVar$LCfact)
-    
     macroVar$LCsort <- relevel(macroVar$LCfact, ref = "51") # sort? kind of? reference level
-    
     fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="") 
-    
     load(fileName) 
-    # the following supresses error message when new level factor appears on sampling data. Warning: Bias
-    # test$xlevels$plan2017fact <- levels(macroVar$plan2017fact) 
-    idDummy       <- macroVar$plan2017 %in% as.numeric(test$xlevels$plan2017fact)
-    macroVar.flt  <- macroVar[idDummy,]
-    
-    tp.dummy <- to_predict(test, macroVar.flt)
-    
-    
+    tp.dummy <- to_predict(test, macroVar)
 
     # tp.dummy[is.na(tp.dummy)] <- 0
     
-    tp.dummy.a                  <- matrix(0, nrow= dim(macroVar)[1], ncol = length(dimnames(tp.dummy)[[2]]))
-    colnames(tp.dummy.a)        <- dimnames(tp.dummy)[[2]]
-    tp.dummy.a[idDummy,]        <- tp.dummy
-    tp.stats.ls[[i]]            <- tp.dummy.a # the estimated transition probability
+   
+    tp.stats.ls[[i]]            <- tp.dummy # the estimated transition probability
     colnames(tp.stats.ls[[i]] ) <- dimnames(tp.dummy)[[2]]
     
     tp.stats.names.ls[[i]]      <- dimnames(tp.dummy)[[2]]

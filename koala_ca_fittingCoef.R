@@ -88,8 +88,7 @@ for (i in 1:length(luLabel)){
                      cly + 
                      NeighUrb + 
                      UFfact +
-                     sa4fact +
-                     plan2017fact, 
+                     sa4fact , 
                    data = macroVar,
                    na.action = na.exclude,
                    maxit = 150) 
