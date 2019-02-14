@@ -33,8 +33,9 @@ if (!require("RNetLogo")) install.packages("RNetLogo"); library("RNetLogo")
 if (!require("nnet"))     install.packages("nnet")    ; library("nnet")
 if (!require("grDevices"))install.packages("grDevices");library("grDevices")
 if (!require("diffeR"))   install.packages("diffeR")  ;library("diffeR")
-if (!require("parallel")) install.packages("parallel"); library("parallel")
-
+if (!require("snowfall")) install.packages("snowfall"); library("snowfall")
+if (!require("foreach"))  install.packages("foreach") ; library("foreach")
+if (!require("doParallel"))install.packages("doParallel"); library("doParallel")
 
 
 
@@ -343,7 +344,7 @@ luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 initLU.df     <- lu2016.df$lu2016 
 initYear      <- 2016   
 nYearGap      <- 17
-tSimul        <- 1  
+tSimul        <- 10  
 outputFold    <- ""
 
 luSimul.ls    <- list()
@@ -567,8 +568,8 @@ for (t in 0:tSimul) {
   
   
   ##__4.4 -- Start simulation here####
-  if (!require("foreach"))    install.packages("foreach")   ; library("foreach")
-  if (!require("doParallel")) install.packages("doParallel"); library("doParallel")
+  
+  
   no_cores      <- detectCores() - 1
   cl            <- makeCluster(no_cores)  # initiate parallel computing
 
@@ -593,7 +594,6 @@ for (t in 0:tSimul) {
   
   ## remove the salt and pepper using to_get_mode function
   
-  if (!require("snowfall")) install.packages("snowfall"); library("snowfall")
 
   
   

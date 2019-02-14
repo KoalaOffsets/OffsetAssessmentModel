@@ -43,7 +43,7 @@ if (!require("parallel")) install.packages("parallel"); library("parallel")
 
 ## 2. FUNCTIONS ===================================================== 
 
-# input df
+# input df. Required to convert df into raster according to SEQ base map (sa4)
 to_raster <- function(df.dummy) {
   mat.dummy             <- raster(t(matrix(df.dummy, ncol = 2359, nrow = 1152)))
   extent(mat.dummy)     <- extent(sa4)
@@ -51,7 +51,7 @@ to_raster <- function(df.dummy) {
   return(mat.dummy)
 }
 
-# stats::predict, use lapply
+# stats::predict, use lapply to predict the probability using var on newdata and coeff
 to_predict <- function (coeff, newdata.df) {
   stats::predict(coeff, newdata = newdata.df, type = "probs", se = TRUE, na.action = na.exclude)
 }
@@ -107,7 +107,7 @@ to_zero_one <- function (datasetDummy) {
   return (converted_dataset)
 }
 
-# to get the mode of a matrix
+# to get the mode of a matrix. as default mode in R is missing
 to_get_mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]

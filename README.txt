@@ -41,14 +41,15 @@ Classification of land-use classes with their codes in the model are,
 72 Industrial,
 80 Water
 
-The CA-MLR model has three modules
+The CA-MLR model has four modules
 1. koala_ca_selectSample
 2. koala_ca_fittingCoef
 3. koala_ca_simulate
+4. koala_ca_forward
 
-For calibration purposes: Note that user does not need to run all three modules to start the simulation. The koala_ca_selectSample and koala_ca_fittingCoef that produce respectively (1) the selection of samples based on the land-use changes pathway, and (2) the fitting the coefficient of estimates and intercepts have previously been run and their results can be called from koala_ca_simulate.
+For calibration purposes: Note that user does not need to run all four modules to start the simulation. The koala_ca_selectSample and koala_ca_fittingCoef that produce respectively (1) the selection of samples based on the land-use changes pathway, and (2) the fitting the coefficient of estimates and intercepts have previously been run and their results can be called from koala_ca_simulate.
 
-Unless NEW independent variables become available, the koala_ca_selectSample and koala_ca_selectSample need to be run. 
+Unless NEW independent variables become available or existing independent variable needs to be taken away, the koala_ca_selectSample and koala_ca_selectSample need to be run. 
 
 
 2. How to run koala_ca_selectSample
@@ -107,70 +108,102 @@ This step runs the estimation of coefficients and intercepts for MLR. Using the 
 
 4. How to run koala_ca_simulate
 -----------------------------------
-koala_ca_simulate is the core module for running the simulation of land-use changes. 
+koala_ca_simulate simulates land-use changes in 2016 using the estimated coefficients obtained by comparing land use 1999 and 2016.  
 
 
 0. Start
 1. Checking and installing the required packages
-2. Load input
-3. Functions
-4. Input data preparation
-5. Land-use change simulation
-6. Accuracy assessment
-7. Export maps for visualization
+2. Functions 
+3. Load input
+4. Simulation
+5. Accuracy assessment
+6. Export maps for visualization
 
-Steps 0 - 4 are routine procedure before running this module. They have similar procedures as in koala_ca_selectSample.
+Step 0. START 
+Remove existing variables in the workspace including figures (if any)
 
-Step 0. Start: Remove existing variables in the workspace including figures (if any)
+Step 1. CHECKING AND INSTALLING REQUIRED PACKAGES
+Instal the required packages to run the module. 
 
-Step 1. Instal the required packages to run the module
+Step 2. FUNCTIONS
+Define functions for running the koala_ca_simulate. The functions start with "to_" to differentiate with variables. Frequently used functions are to_raster and to_get_mode. to_raster converts data.frame input into raster. The input needs to have ncol = 2359, nrow = 1152.
 
-Step 2. Load the inputs, convert into data frame, and simplify the name of headers. In this step, users need to define the working directory (step 2.1) before proceeding into subsequent steps. The default working directory is  
+Step 3. LOAD WORKING MAPS
+(sub-step 3.1) Users need to define the working directory  before proceeding into subsequent steps. The default working directory is ("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset"). Alternatively, to work in the GPEM-LSEC2 server, users need to change the working directory into  ("M:/Projects/koala_offsets/04 Model/CA-KoalaOffset"). If problem appears during Load the input from "../input/maps/", check the working directory on step 3.1. Make sure you have the correct working directory that contains "../input/maps/" folder.(step 3.1).
 
- ("C:/Users/uqawahy1/Documents/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset"). 
+(Sub-Step 3.2) New independent variables can be added using "[variable_dataset] <- raster( "input/maps/variable.asc")". The required file type is ASCII. The ASCII file can be prepared by exporting original Raster file in GIS into ASCII file with standard extent and spatial projection similar to land-use map 1999. After Loading the inputs, convert the raster maps into data frame, and simplify the name of headers. 
 
-Alternatively, to work in the GPEM-LSEC2 server, users need to change the working directory into 
+(Sub-Step 3.3) Convert dataframe with original unit into new values with [0 1] range of values. Exclude the protection and recreation areas (constraints). 
+(Optional) Plot the histogram and maps of the input independent variables.
 
- ("M:/Projects/koala_offsets/04 Model/CA-KoalaOffset"). 
+Step 4. SIMULATION 
+(sub-step 4.1) Set the simulation parameters. Two important simulation paramteres are nYearGap and tSimul. The nYearGap defines the simulation cycle for single run, whilst the tSimul defines how many cycle the simulation need to run. The default nYearGap is 17 and tSimul 1, which means the simulaiton will run for one cycle (tSimul=1) and each cycle represents 17 years.
 
-If problem appears during Load the input from "../input/maps/", check the working directory on step 2.1. Make sure you have the correct working directory that contains "../input/maps/" folder.
+(sub-step 4.2) Get the transition probability using the coefficiento f estimate and independent variable in stackMacroVar. Select the cell acording to current Land use where transition probability needs to be estimated. Then predict the transition probability using to_predict function. Whereever the transition probability is NA or total transition probability is 0, then return the transition probability to initial land use (initial land class gets 1 transition probability and the remaining land classes get zero 0).
 
-Step 3. Define functions for running the simulation on the subsequent steps and modules. New independent variables can be added using "[variable_dataset] <- raster( "input/maps/variable.asc")". The required file type is ASCII. The ASCII file can be prepared by exporting original Raster file in GIS into ASCII file with standard extent and spatial projection similar to land-use map 1999.
+(sub-step 4.3) This sub-step adjusts the transition probability according to nYearGap (one cycle of simulation period). The smaller the nYearGap, the less likely land use changes occur.
 
-Step 4. Prepare the input data for simulation as well as the estimated transition probability (tp) on each cell. There are three sections in this module.
+(sub-step 4.4) Core of the simulation. Run the simulation using the transition probability produced by multinomial logistic regression. Users need to set the number of simulation instances (nSimulation). To determine the selected land use classes, the random multinomial (rmultinom) was used. Apply rmultinom over row [with binary results of 0 and 1] and multiple the binary result with the 13 land use classes using cross-product. To speed up the simulation instances, parallel computing is used. Simulate the model in gpem-lsec2 to get the advantage of multi-cores computer and hence speed-up the simulation. Once simulation instances are obtained, the "to_get_mode" is implemented to remove the salt-and-pepper effect.
 
-Section 4.1 Convert input data into the range of zero and one [0 1]. To check the converted probability distribution function (pdf) of independent variablesm un-comments the "# hist" lines. To plot the converted independent variables, un-comments the "# plot" lines.
+(sub-step 4.5) Update the neighborhood urban ratio. The Default windows is 5 by 5. Function to_neighUrb" gives 100 when all the 5 by 5 neighbouring cells are urban.
 
-Section 4.2 Predict the transition probablity on every cells in the study area using the independent variables and the coefficients of estimates.
 
-Section 4.3 Re-write the transition probability for each possible transitions. tp_zero means no transition possibility observed.  
+Step 5. ACCURACY ASSESSMENT USING KAPPA
+(sub-step 5.1) Accuracy assessment using kappa and statistical accuracy. Users need to define the initialLU (input land use map at t=0), actualLU (actual land use map as reference), and simultLU (the simulate land use to be compared with the referenced map).
 
- tp.stats.10.10 <- to_raster(tp.stats[[1]][,2])
+(sub-step 5.2) Locational accuracy assessment using missed-hit and correct-hit indices. 
+
+Step 6. EXPORT MAP 
+Export the simulation results and their accuracy assessent into .asc, .grd, .tif. Folder's name is YYYYMMDD based on the simulation day.
+
+
+5. How to run koala_ca_forward
+-----------------------------------
+Similar to koala_ca_simulate but with planning scheme 2017 as the contrainst.
+
+
+0. Start
+1. Checking and installing the required packages
+2. Functions 
+3. Load input
+4. Simulation
+6. Export maps for visualization
+
+Step 0. START 
+Remove existing variables in the workspace including figures (if any)
+
+Step 1. CHECKING AND INSTALLING REQUIRED PACKAGES
+Instal the required packages to run the module. 
+
+Step 2. FUNCTIONS
+Define functions for running the koala_ca_simulate. The functions start with "to_" to differentiate with variables. Frequently used functions are to_raster and to_get_mode. to_raster converts data.frame input into raster. The input needs to have ncol = 2359, nrow = 1152.
+
+Step 3. LOAD WORKING MAPS
+(sub-step 3.1) Users need to define the working directory  before proceeding into subsequent steps. The default working directory is ("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset"). Alternatively, to work in the GPEM-LSEC2 server, users need to change the working directory into  ("M:/Projects/koala_offsets/04 Model/CA-KoalaOffset"). If problem appears during Load the input from "../input/maps/", check the working directory on step 3.1. Make sure you have the correct working directory that contains "../input/maps/" folder.(step 3.1).
+
+
+(Sub-Step 3.2) New independent variables can be added using "[variable_dataset] <- raster( "input/maps/variable.asc")". The required file type is ASCII. The ASCII file can be prepared by exporting original Raster file in GIS into ASCII file with standard extent and spatial projection similar to land-use map 1999. After Loading the inputs, convert the raster maps into data frame, and simplify the name of headers. The modulem also loads the planning scheme 2017 table that contains binary values [0 or 1] according to zoning description and land classes. 
+
+(Sub-Step 3.3) Convert dataframe with original unit into new values with [0 1] range of values. Exclude the protection and recreation areas (constraints). 
+(Optional) Plot the histogram and maps of the input independent variables.
+
+Step 4. SIMULATION 
+(sub-step 4.1) Set the simulation parameters. Two important simulation paramteres are nYearGap and tSimul. The nYearGap defines the simulation cycle for single run, whilst the tSimul defines how many cycle the simulation need to run. The default nYearGap is 17 and tSimul 1, which means the simulaiton will run for one cycle (tSimul=1) and each cycle represents 17 years.
+
+(sub-step 4.2) Get the transition probability using the coefficiento f estimate and independent variable in stackMacroVar. Select the cell acording to current Land use where transition probability needs to be estimated. Then predict the transition probability using to_predict function. Whereever the transition probability is NA or total transition probability is 0, then return the transition probability to initial land use (initial land class gets 1 transition probability and the remaining land classes get zero 0).
+Applying the planning scheme as contraint.  Development of a land class that can occur on particular zoning area receive 1 in constraint matrix, whereas development that are not allowed in particular zone receive zero (0). Hence, Multipling the transition probability with the constraint matrix will adjust the transition probability according to planning scheme 2017.  the Adjust the transition probability to total of one according to current land use class.
+
+(sub-step 4.3) This sub-step adjusts the transition probability according to nYearGap (one cycle of simulation period). The smaller the nYearGap, the less likely land use changes occur.
+
+(sub-step 4.4) Core of the simulation. Run the simulation using the transition probability produced by multinomial logistic regression. Users need to set the number of simulation instances (nSimulation). To determine the selected land use classes, the random multinomial (rmultinom) was used. Apply rmultinom over row [with binary results of 0 and 1] and multiple the binary result with the 13 land use classes using cross-product. To speed up the simulation instances, parallel computing is used. Simulate the model in gpem-lsec2 to get the advantage of multi-cores computer and hence speed-up the simulation. Once simulation instances are obtained, the "to_get_mode" is implemented to remove the salt-and-pepper effect.
+
+(sub-step 4.5) Update the neighborhood urban ratio. The Default windows is 5 by 5. Function to_neighUrb" gives 100 when all the 5 by 5 neighbouring cells are urban.
+
+
  
-The above line has a meaning of transition probability from 10 (conservation) into 10 (conservation).
 
-
-Step 5. This is the core module for land-use change simulation. The module simply runs multinomial random land-class selection based on transition probability on each cell. This module could onlly run properly when the necessary input data and parameters are available.
-
-There are three sections on this module.
-Section 5.1 Preparation of simulation parameters
-
-
-Section 5.2 Calibration of CA model. (LU1999->LU2016) VS (LU1999->SimulLU2016)
-
-Section 5.3
-
-
-
-Step 6. Accuracy assessment module. This module assesses the accuracy of simulation result. Using the observed land-use map 1999 and 2016, different accuracy indices are used. The 
-
-
-
-Step 7. Export the simulation results and their accuracy assessent into ArcGIS. Folder that stors the exported maps can be modified by changing "output/20181114" on the following lines
-
-  filen  <- paste("output/20181114/lu_simul_", 1999+i, ".asc", sep="")	
-  filen  <- paste("output/20181114/lu_simul_change.asc", sep="")	
-
+Step 6. EXPORT MAP 
+Export the simulation results and their accuracy assessent into .asc, .grd, .tif. Folder's name is YYYYMMDD based on the simulation day.
 
 
 
