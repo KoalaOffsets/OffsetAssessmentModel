@@ -435,8 +435,6 @@ for (t in 0:tSimul) {
     macroVar$plan2010fact   <- factor(macroVar$plan2010)
     macroVar$plan2017fact   <- factor(macroVar$plan2017)
     
-    levels(macroVar$LCfact)
-    macroVar$LCsort <- relevel(macroVar$LCfact, ref = "51") # sort? kind of? reference level
     fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="") 
     load(fileName) 
     tp.dummy <- to_predict(test, macroVar)
@@ -446,7 +444,6 @@ for (t in 0:tSimul) {
    
     tp.stats.ls[[i]]            <- tp.dummy # the estimated transition probability
     colnames(tp.stats.ls[[i]] ) <- dimnames(tp.dummy)[[2]]
-    
     tp.stats.names.ls[[i]]      <- dimnames(tp.dummy)[[2]]
   }
   

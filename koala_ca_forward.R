@@ -434,7 +434,6 @@ for (t in 0:tSimul) {
     macroVar$plan2017fact   <- factor(macroVar$plan2017)
     
 
-    macroVar$LCsort <- relevel(macroVar$LCfact, ref = "51") # sort? kind of? reference level
     fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="") 
     load(fileName) 
     tp.dummy      <- to_predict(test, macroVar)
@@ -577,7 +576,7 @@ for (t in 0:tSimul) {
   
   
   ifelse ( t == 0,  
-           luSimulMode   <- as.numeric(tp.cover$luDynmc) ,          # at t=0, no need to repeat simulation instances 
+           luSimulMode   <- as.numeric(luSimulStack) ,          # at t=0, no need to repeat simulation instances 
            luSimulMode   <- parRapply(cl, luSimulStack, to_get_mode) ) # application of apply by row on parallel computing
   
   stopCluster(cl)  # stop parallel computing
@@ -594,7 +593,7 @@ for (t in 0:tSimul) {
   
   
   
-  plot(to_raster(luSimulMode), breaks=breakpoints,col=colors)
+  plot(to_raster(tp.cover$luDynmc), breaks=breakpoints,col=colors)
   title(paste("Simulation map of", t*nYearGap+initYear ))
   
   
@@ -606,10 +605,10 @@ for (t in 0:tSimul) {
   names(luDummy.nu.df) <- "NeighUrb"
   MacroVar$NeighUrb <- luDummy.nu.df$NeighUrb 
   stackMacroVar.df$NeighUrb <- to_zero_one(MacroVar$NeighUrb)
-  # stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
+  stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
   
   freqLU <- cbind(freqLU, freq(to_raster(tp.cover$luDynmc))[,2])
-  
+  print(freqLU)
   remove(test0, luDummy.nu.df, luDummy.rs, luDummy.nu)
   gc() # release memory after looping and removing variables
 }
