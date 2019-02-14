@@ -33,6 +33,9 @@ if (!require("RNetLogo")) install.packages("RNetLogo"); library("RNetLogo")
 if (!require("nnet"))     install.packages("nnet")    ; library("nnet")
 if (!require("grDevices"))install.packages("grDevices");library("grDevices")
 if (!require("diffeR"))   install.packages("diffeR")  ;library("diffeR")
+if (!require("parallel")) install.packages("parallel"); library("parallel")
+
+
 
 
 
@@ -431,28 +434,16 @@ for (t in 0:tSimul) {
     macroVar$plan2017fact   <- factor(macroVar$plan2017)
     
 
-
+    macroVar$LCsort <- relevel(macroVar$LCfact, ref = "51") # sort? kind of? reference level
     fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="") 
-    
     load(fileName) 
-    # the following supresses error message when new level factor appears on sampling data. Warning: Bias
-    # test$xlevels$plan2017fact <- levels(macroVar$plan2017fact) 
-    idDummy.pl    <- macroVar$plan2017 %in% as.numeric(test$xlevels$plan2017fact)
-    idDummy.sa    <- macroVar$sa4 %in% as.numeric(test$xlevels$sa4fact)
-    idDummy       <- idDummy.pl & idDummy.sa
-    macroVar.flt  <- macroVar[idDummy,]
-    tp.dummy      <- to_predict(test, macroVar.flt)
-    
-    
-    
+    tp.dummy      <- to_predict(test, macroVar)
+       
     # tp.dummy[is.na(tp.dummy)] <- 0
     
-    tp.dummy.a                  <- matrix(0, nrow= dim(macroVar)[1], ncol = length(dimnames(tp.dummy)[[2]]))
-    colnames(tp.dummy.a)        <- dimnames(tp.dummy)[[2]]
-    tp.dummy.a[idDummy,]        <- tp.dummy
-    tp.stats.ls[[i]]            <- tp.dummy.a # the estimated transition probability
+	
+    tp.stats.ls[[i]]            <- tp.dummy # the estimated transition probability
     colnames(tp.stats.ls[[i]] ) <- dimnames(tp.dummy)[[2]]
-    
     tp.stats.names.ls[[i]]      <- dimnames(tp.dummy)[[2]]
   }
   
@@ -551,7 +542,13 @@ for (t in 0:tSimul) {
   
   
   
-  ##__4.4 -- Start simulation here#### 
+  ##__4.4 -- Start simulation here####
+  if (!require("foreach"))    install.packages("foreach")   ; library("foreach")
+  if (!require("doParallel")) install.packages("doParallel"); library("doParallel")
+  no_cores      <- detectCores() - 1
+  cl            <- makeCluster(no_cores)  # initiate parallel computing
+
+  
   tp.simul      <- cbind(tp.cover.nona.df[,1:id10-1], tp.Ratio) # transition probability used for simulation
   luSimulStack  <- c() 
   
@@ -559,36 +556,50 @@ for (t in 0:tSimul) {
            nSimulationDummy <- 1 ,          # at t=0, no need to repeat simulation instances 
            nSimulationDummy <- nSimulation) 
   
-  for (i in 1:nSimulationDummy){
-    print(paste("Simulation no ", i, " of ", nSimulationDummy, sep = ""))
-    tp.simul$luDynmc <- crossprod(apply(tp.simul[, c(id10:id80)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)
-    
-    test0 <- tp.simul %>% 
-      dplyr:: select(orig_rank,luDynmc ) 
-    
-    tp.cover$luDynmc <- c()
-    tp.cover<- dplyr::left_join(tp.cover, test0, by = "orig_rank")
-    
-    
-    luSimulStack <- cbind(luSimulStack, tp.cover$luDynmc) 
-    
-  }
+  registerDoParallel(cl)  # use multicore, set to the number of our cores
+  luSimulStack <- foreach (i=1:nSimulationDummy, .combine=cbind) %dopar% {                       # colomn bind the simulated LU map 
+    crossprod(apply(tp.simul[, c(id10:id80)], 1, function(x) rmultinom(1,size = 1,x)),luLabel)}  # selection of land class based on TP
+  stopImplicitCluster()
+  gc()
   
-  ## colomn bind the simulated LU map 
+  
+  
+  
+  
+  
   ## remove the salt and pepper using to_get_mode function
+  
+  if (!require("snowfall")) install.packages("snowfall"); library("snowfall")
+
+  
   
   luSimul.ls[[t+1]] <- luSimulStack
   
+  
   ifelse ( t == 0,  
            luSimulMode   <- as.numeric(tp.cover$luDynmc) ,          # at t=0, no need to repeat simulation instances 
-           luSimulMode   <- apply(luSimulStack,1, function(x) to_get_mode(x)) )
+           luSimulMode   <- parRapply(cl, luSimulStack, to_get_mode) ) # application of apply by row on parallel computing
+  
+  stopCluster(cl)  # stop parallel computing
+  
+  test0 <- tp.simul %>%  
+    dplyr:: select(orig_rank )
+  
+  test0 <- cbind(test0, luSimulMode)
+  names(test0)[2] <- "luDynmc"
+  
+  tp.cover$luDynmc <- c() 
+  tp.cover<- dplyr::left_join(tp.cover, test0, by = "orig_rank")
+  
+  
+  
   
   plot(to_raster(luSimulMode), breaks=breakpoints,col=colors)
   title(paste("Simulation map of", t*nYearGap+initYear ))
   
   
   ##__4.5 -- Update the dynamic neighborhood urban ratio ####
-  tp.cover$luDynmc  <- luSimulMode
+
   luDummy.rs        <- to_raster(tp.cover$luDynmc)
   luDummy.nu        <- to_neighUrb(luDummy.rs, 5, 5)
   luDummy.nu.df     <- as.data.frame(luDummy.nu)
@@ -602,6 +613,12 @@ for (t in 0:tSimul) {
   remove(test0, luDummy.nu.df, luDummy.rs, luDummy.nu)
   gc() # release memory after looping and removing variables
 }
+
+
+
+
+
+
 
 
 
