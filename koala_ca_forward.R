@@ -179,7 +179,7 @@ kada_bush_uf       <- raster( "input/maps/seq_kada_bushland_outside_uf_hab_only.
 luChange           <- raster( "input/maps/seq_lndcovch4.asc") #[first two digits:lu1999 , last two digits: lu2016]
 plan2010           <- raster( "input/maps/seq_planning_scheme_2010.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description
 plan2017           <- raster( "input/maps/seq_planning_scheme_2017b.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description
-
+plan2017.tb        <- read.csv("input/table/planningScheme2017.csv", header = TRUE) # planning scheme constraints table
 
 sprp_ada       [is.na(sprp_ada) & (!is.na(lu1999))]        = 0
 kada_bush_uf   [is.na(kada_bush_uf) & (!is.na(lu1999))]    = 0
@@ -488,7 +488,32 @@ for (t in 0:tSimul) {
     
   }
   
-  tp.cover.nona.df <- tp.cover %>%
+  
+  
+  
+  ##____4.2.6 APPLYING PLANNING SCHEME AS CONSTRAINTS
+  tp.forward = tp.cover # duplicate tp.cover into tp with planning scheme as constraint.
+  
+  for (i in 1:dim(plan2017.tb)[1] ){
+    for (j in 1:(dim(plan2017.tb)[2]-1) ){
+    
+      index1 = which(tp.forward$plan2017 == plan2017.tb$planningscheme[i] )
+      consId = plan2017.tb[i,j+1]
+      tp.forward[index1,id10+j-1] = tp.cover[index1,id10+j-1] * consId
+    }
+  }
+  
+  
+  ## sum tp of one. according to current land use
+  sumTP         <- rowSums(tp.forward[, id10:id80])
+  
+  for (i in 1:length(luLabel) ){
+    idTP          <- which(tp.forward$luDynmc == luLabel[i]) 
+    tp.forward[idTP,(id10+i-1)]  <- 1- sumTP [idTP] + tp.forward[idTP,(id10+i-1)] 
+  }
+  
+  
+  tp.cover.nona.df <- tp.forward %>%
     mutate(tpSum = rowSums(.[id10:id80])) %>% 
     dplyr::filter(tpSum!=0) 
   
