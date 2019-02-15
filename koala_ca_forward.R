@@ -474,18 +474,22 @@ for (t in 0:tSimul) {
   
   id10 = which(names(tp.cover)=="10")
   id80 = which(names(tp.cover)=="80")
+  luStay = c(10,80)                     ## The land classes that stay during the simulation run
+  
   
   sumTP         <- rowSums(tp.cover[, id10:id80])
   
   for (i in 1:length(luLabel) ){
-    idTP          <- which(tp.cover$luDummy == luLabel[i] & sumTP== 0)
-    tp.cover[idTP,id10+i-1]  <- 1
-
+    idTP                          <- which(tp.cover$luDummy == luLabel[i] & sumTP== 0)
+    tp.cover[idTP,id10+i-1]       <- 1
+    idTP                          <- which(tp.cover$luDummy == luLabel[i] & is.na(sumTP))
+    tp.cover[idTP,c(id10:id80)]   <- 0
+    tp.cover[idTP,id10+i-1]       <- 1
     
-    idTP          <- which(tp.cover$luDummy == luLabel[i] & is.na(sumTP))
-    tp.cover[idTP,c(id10:id80)]  <- 0
-    
-    tp.cover[idTP,id10+i-1]  <- 1
+    if (luLabel[i] %in% luStay){
+      idTP                          <- which(tp.cover$luDummy == luLabel[i])
+      tp.cover[idTP,c(id10:id80)]   <- 0
+      tp.cover[idTP,id10+i-1]       <- 1}
     
   }
   
@@ -494,6 +498,9 @@ for (t in 0:tSimul) {
   
   ##____4.2.6 APPLYING PLANNING SCHEME AS CONSTRAINTS
   tp.forward = tp.cover # duplicate tp.cover into tp with planning scheme as constraint.
+  
+  
+  
   
   for (i in 1:dim(plan2017.tb)[1] ){
     for (j in 1:(dim(plan2017.tb)[2]-1) ){
