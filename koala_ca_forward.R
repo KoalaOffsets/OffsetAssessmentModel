@@ -180,6 +180,7 @@ kada_bush_uf       <- raster( "input/maps/seq_kada_bushland_outside_uf_hab_only.
 luChange           <- raster( "input/maps/seq_lndcovch4.asc") #[first two digits:lu1999 , last two digits: lu2016]
 plan2010           <- raster( "input/maps/seq_planning_scheme_2010.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description
 plan2017           <- raster( "input/maps/seq_planning_scheme_2017b.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description
+
 plan2017.tb        <- read.csv("input/table/planningScheme2017.csv", header = TRUE) # planning scheme constraints table
 
 sprp_ada       [is.na(sprp_ada) & (!is.na(lu1999))]        = 0
@@ -340,11 +341,13 @@ blue          <- c(0,182,51,0,0,222,206,153,103,156,217,166,213)
 colors        <- rgb(red, green, blue, maxColorValue = 255)
 breakpoints   <- c(0,10,21,22,23,30,40,51,52,53,60,71,72,80)
 luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
+luStay        <- c(80) ## Land classes that stay unchanged during the simulation run
+
 
 initLU.df     <- lu2016.df$lu2016 
 initYear      <- 2016   
 nYearGap      <- 17
-tSimul        <- 10  
+tSimul        <- 150  
 outputFold    <- ""
 
 luSimul.ls    <- list()
@@ -474,7 +477,6 @@ for (t in 0:tSimul) {
   
   id10 = which(names(tp.cover)=="10")
   id80 = which(names(tp.cover)=="80")
-  luStay = c(10,80)                     ## The land classes that stay during the simulation run
   
   
   sumTP         <- rowSums(tp.cover[, id10:id80])
@@ -640,6 +642,8 @@ for (t in 0:tSimul) {
   stackMacroVar.df$NeighUrb [(stackMacroVar.df$protectArea != 0) | (stackMacroVar.df$recreArea != 0) ] <- NA
   
   freqLU <- cbind(freqLU, freq(to_raster(tp.cover$luDynmc))[,2])
+  colnames(freqLU)[t+3] <- as.character(t)
+  
   print(freqLU)
   remove(test0, luDummy.nu.df, luDummy.rs, luDummy.nu)
   gc() # release memory after looping and removing variables
