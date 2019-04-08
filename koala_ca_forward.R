@@ -664,7 +664,7 @@ for (t in 0:tSimul) {
   
   
   
-  luSimul.ls[[t+1]] <- luSimulStack
+  # luSimul.ls[[t+1]] <- luSimulStack
   
   
   ifelse ( t == 0,  
