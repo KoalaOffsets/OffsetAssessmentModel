@@ -343,7 +343,7 @@ blue          <- c(0,182,51,0,0,222,206,153,103,156,217,166,213)
 colors        <- rgb(red, green, blue, maxColorValue = 255)
 breakpoints   <- c(0,10,21,22,23,30,40,51,52,53,60,71,72,80)
 luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
-urbanDemand   <- c(71584, 63243, 11269 ) ## 51 52 53 urban land demand; \KOALA2018-A0206\04 Model\CA-KoalaOffset\output\table$bencmark cells Z42-44
+urbanDemand   <- c(71077, 58834, 10484 ) ## 51 52 53 urban land demand; \KOALA2018-A0206\04 Model\CA-KoalaOffset\output\table\Land_reclassification$lu2016vsLGA cells W9:W11
 luStay        <- c(60,71,72,80) ## Land classes that stay unchanged during the simulation run
 
 
@@ -443,7 +443,9 @@ for (t in 0:tSimul) {
 
     fileName = paste("./input/mlrsummary_NeighUrb_UF/coefficient", i, ".rda", sep="") 
     load(fileName) 
-    tp.dummy      <- to_predict(test, macroVar)
+    
+    test$xlevels$sa4fact    <- levels(stackMacroVar.df$sa4fact)
+    tp.dummy                <- to_predict(test, macroVar)
        
     # tp.dummy[is.na(tp.dummy)] <- 0
     
@@ -692,8 +694,8 @@ for (t in 0:tSimul) {
   
   
   
-  plot(to_raster(tp.cover$luDynmc), breaks=breakpoints,col=colors)
-  title(paste("Simulation map of", t*nYearGap+initYear ))
+  # plot(to_raster(tp.cover$luDynmc), breaks=breakpoints,col=colors)
+  # title(paste("Simulation map of", t*nYearGap+initYear ))
   
   
   ##__4.5 -- Update the dynamic neighborhood urban ratio ####
@@ -757,6 +759,13 @@ filen       <- paste( mainDir,"/", subDir , "/lu_simul_", initYear+(nYearGap*t),
 writeRaster(x = to_raster(simultLu), filename = paste(filen, ".asc",  sep=""), format = "ascii", overwrite=TRUE)
 writeRaster(x = to_raster(simultLu), filename = paste(filen, ".tif",  sep=""), format = "GTiff", overwrite=TRUE)
 writeRaster(x = to_raster(simultLu), filename = paste(filen, ".grd",  sep=""), overwrite=TRUE)
+
+
+png(filename = paste(filen, ".png",  sep=""),width = 800, height = 1600, bg="white") 
+plot(to_raster(simultLu), breaks=breakpoints,col=colors)
+dev.off()
+
+
 
 
 filen       <- paste( mainDir,"/", subDir ,  "/", sep="")	
