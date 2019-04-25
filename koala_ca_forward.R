@@ -148,8 +148,10 @@ to_neighUrb <- function (inputRaster, movWin_nrow, movWin_ncol) {
 
 
 ##__3.1 -- Set working path $ DO CHANGE THIS PATH ####
-setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
-# setwd ("M:/Projects/koala_offsets/04 Model/CA-KoalaOffset") ## server gpem-lsec2
+# setwd("~/UQ-Research (uq.edu.au)/KOALA2018-A0206/04 Model/CA-KoalaOffset")
+# setwd ("D:\KOALA2018-A0206\04 Model\CA-KoalaOffset") ## server gpem-lsec2
+setwd ("C:/KOALA2018-A0206/04 Model/CA-KoalaOffset") ## dell local laptop
+
 
 
 ##__3.2 -- Load working maps ####
@@ -342,7 +344,7 @@ colors        <- rgb(red, green, blue, maxColorValue = 255)
 breakpoints   <- c(0,10,21,22,23,30,40,51,52,53,60,71,72,80)
 luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
 urbanDemand   <- c(71584, 63243, 11269 ) ## 51 52 53 urban land demand; \KOALA2018-A0206\04 Model\CA-KoalaOffset\output\table$bencmark cells Z42-44
-luStay        <- c(80) ## Land classes that stay unchanged during the simulation run
+luStay        <- c(60,71,72,80) ## Land classes that stay unchanged during the simulation run
 
 
 initLU.df     <- lu2016.df$lu2016 
@@ -692,7 +694,7 @@ for (t in 0:tSimul) {
   ##__4.5 -- Update the dynamic neighborhood urban ratio ####
 
   luDummy.rs        <- to_raster(tp.cover$luDynmc)
-  luDummy.nu        <- to_neighUrb(luDummy.rs, 5, 5)
+  luDummy.nu        <- to_neighUrb(luDummy.rs, 25, 25)
   luDummy.nu.df     <- as.data.frame(luDummy.nu)
   names(luDummy.nu.df) <- "NeighUrb"
   MacroVar$NeighUrb <- luDummy.nu.df$NeighUrb 
