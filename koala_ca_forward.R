@@ -498,7 +498,12 @@ for (t in 0:tSimul) {
     if (luLabel[i] %in% luStay){
       idTP                          <- which(tp.cover$luDummy == luLabel[i])
       tp.cover[idTP,c(id10:id80)]   <- 0
-      tp.cover[idTP,id10+i-1]       <- 1}
+      tp.cover[idTP,id10+i-1]       <- 1
+      
+      idTP                          <- which(tp.cover$luDummy != luLabel[i])
+      tp.cover[idTP,id10+i-1]       <- 0
+      
+      }
     
   }
   
