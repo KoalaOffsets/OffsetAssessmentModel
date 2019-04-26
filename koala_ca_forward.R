@@ -343,7 +343,7 @@ blue          <- c(0,182,51,0,0,222,206,153,103,156,217,166,213)
 colors        <- rgb(red, green, blue, maxColorValue = 255)
 breakpoints   <- c(0,10,21,22,23,30,40,51,52,53,60,71,72,80)
 luLabel       <- c(10,21,22,23,30,40,51,52,53,60,71,72,80)
-urbanDemand   <- c(71077, 58834, 10484 ) ## 51 52 53 urban land demand; \KOALA2018-A0206\04 Model\CA-KoalaOffset\output\table\Land_reclassification$lu2016vsLGA cells W9:W11
+urbanDemand   <- c(78988, 57137, 10181 ) ## 51 52 53 urban land demand; \KOALA2018-A0206\04 Model\CA-KoalaOffset\output\table\Land_reclassification$lu2016vsLGA cells W9:W11
 luStay        <- c(60,71,72,80) ## Land classes that stay unchanged during the simulation run
 
 
