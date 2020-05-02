@@ -242,34 +242,34 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Ho
 
   # determine where is protected, where impacts can be offset, and where offset sites can be located under the previous or current regulation/policy
   if (Reg == "previous") {
-    Prot <- max(stack(PKadaB, KadaBOU)) * PdaInv # previous protected areas
+    Prot <- max(stack(PKadaB, KadaBOU)) * PdaInv * KraInv # previous protected areas
     names(Prot) <- "Prot"
     ProtInv <- reclassify(Prot, matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2))
     names(ProtInv) <- "ProtInv"
-    ImpOff <- KadaBHMR * ProtInv * PdaInv # areas where impacts to be offset
+    ImpOff <- KadaBHMR * ProtInv * PdaInv * KraInv # areas where impacts to be offset
     names(ImpOff) <- "ImpOff"
     OffSite <- KadaHMR # areas for offset sites
     names(OffSite) <- "OffSite"
     OffSiteB <- KadaLR # backup areas for offset sites
     names(OffSiteB) <- "OffSiteB"
   } else if (Reg == "current") {
-    Prot <- HabKpa * PdaInv # current protected areas
+    Prot <- HabKpa * PdaInv * KraInv # current protected areas
     names(Prot) <- "Prot"
     ProtInv <- reclassify(Prot, matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2))
     names(ProtInv) <- "ProtInv"
-    ImpOff <- HabNotKpa * ProtInv * PdaInv # areas where impacts to be offset
+    ImpOff <- HabNotKpa * ProtInv *  * KraInv # areas where impacts to be offset
     names(ImpOff) <- "ImpOff"
     OffSite <- RestKpa # areas for offset sites
     names(OffSite) <- "OffSite"
     OffSiteB <- RestNotKpa # backup areas for offset sites
     names(OffSiteB) <- "OffSiteB"
   } else {
-    Prot <- HabKpa * PdaInv # current protected areas
+    Prot <- HabKpa * PdaInv * KraInv # current protected areas
     names(Prot) <- "Prot"
     Prot[Prot == 1] <- 0
     ProtInv <- reclassify(Prot, matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2))
     names(ProtInv) <- "ProtInv"
-    ImpOff <- HabNotKpa * ProtInv * PdaInv # areas where impacts to be offset
+    ImpOff <- HabNotKpa * ProtInv * PdaInv * KraInv # areas where impacts to be offset
     names(ImpOff) <- "ImpOff"
     ImpOff[ImpOff == 1] <- 0
     OffSite <- RestKpa # areas for offset sites
@@ -720,8 +720,10 @@ HabKpa <- raster("input/maps/habkpaf.asc") # protected habitat in koala priority
 HabNotKpa <- raster("input/maps/habnkpaf.asc") # habitat outside of koala priority areas
 RestKpa <- raster("input/maps/restkpaf.asc") # restoration areas in koala priority areas
 RestNotKpa <- raster("input/maps/restnkpaf.asc") # restoration areas outside koala priority areas
-Pda <- raster("input/maps/pda_fin.asc") # koala habitat not protected nor offsets required - priority development area
+Pda <- raster("input/maps/pda_fin.asc") # koala habitat not protected nor offsets required - Priority Development Area
 PdaInv <- reclassify(Pda, matrix(c(0,1,1,0),nrow=2,ncol=2))
+Kra <- raster("input/maps/krafin.asc") # koala habitat not protected nor offsets required - Key Resource Area
+KraInv <- reclassify(Kra, matrix(c(0,1,1,0),nrow=2,ncol=2))
 LandVal <- (raster("input/maps/lvalsimf.asc") + 1) # unimproved land value from 2012 (QVAS data) - here add $1 to avoid zeros. Here have estimated missing or zero values using an inverse distance weighted interpolation (exponential with exponent 2 which had the lowest RMS) and assumed national parks and state land had land vlaues of zero to relfect cost to the state government.
 
 # apply names
@@ -757,6 +759,8 @@ names(RestKpa) <- "RestKpa"
 names(RestNotKpa) <- "restNotKpa"
 names(Pda) <- "Pda"
 names(PdaInv) <- "PdaInv"
+names(Kra) <- "Kra"
+names(KraInv) <- "KraInv"
 names(LandVal) <- "LandVal"
 
 ## SET UP AND RUN SCENARIOS
