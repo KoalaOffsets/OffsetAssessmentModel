@@ -66,19 +66,40 @@ to_raster <- function(df, rast_template) {
 }
 
 # function to allocate offset sites in an LGA - returns the indices of allocated sites, the cost of land purchase, and any remaining impacts not offset yet
-get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Target) {
+get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, PercAvail, Target) {
 
   # check if offsets required
   if (Target > 0) {
+    # calculate the number of offset sites available to select from based on PercAvail
+    if (PercAvail < 100) {
+      if (PercAvail == 0) {
+        NumAvail = 1
+        NumAvailB = 1
+      } else {
+        NumAvail = ceiling(PercAvail * length(which(!is.na(OffArea.df))) / 100)
+        NumAvailB = ceiling(PercAvail * length(which(!is.na(OffAreaB.df))) / 100)
+      }
+    } else {
+      NumAvail = length(which(!is.na(OffArea.df)))
+      NumAvailB = length(which(!is.na(OffAreaB.df)))
+    }
+
     # get cost effectiveness - hectares purchased per $1000
     CostE <- 1000 / Costs
     CostEB <- 1000 / Costs
 
-    #consider only those areas where an offset is possible
+    # consider only those areas where an offset is possible
     CostE[which(is.na(OffArea.df))] <- NA
     CostEB[which(is.na(OffAreaB.df))] <- NA
 
-    # get order based on cost effectiveness
+    # get a random sample of the potential offset sites based on the percent available
+    # set ones that are not available to NA
+    if (NumAvail < length(which(!is.na(OffArea.df)))) {
+      CostE[sample(which(!is.na(CostE)), length(which(!is.na(OffArea.df))) - NumAvail)] <- NA
+      CostEB[sample(which(!is.na(CostEB)), length(which(!is.na(OffAreaB.df))) - NumAvailB)] <- NA
+    }
+
+    # get order of priority based on cost effectiveness
     Order <- order(CostE, OffArea.df, decreasing = TRUE, na.last = TRUE)
     OrderB <- order(CostEB, OffAreaB.df, decreasing = TRUE, na.last = TRUE)
 
@@ -94,8 +115,7 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Targ
 
     # there is enough area for restoration needed in LGA
     if (max(SortAreasSumLGA, na.rm = TRUE) >= Target) {
-
-      #  get the closest value that is at least as large as the target
+      # get the closest value that is at least as large as the target
       DiffTarg <- (SortAreasSumLGA - Target) ^ 2
       MinIndex <- which.min(DiffTarg)
 
@@ -153,10 +173,23 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Targ
 }
 
 # function to allocate offset sites in an LGA - returns the indices of allocated sites, the cost of land purchase, and any remaining impacts not offset yet
-get_off_sites_anywhere <- function(OffArea.df, OffAreaB.df, Costs, Target) {
+get_off_sites_anywhere <- function(OffArea.df, OffAreaB.df, Costs, PercAvail, Target) {
 
 # check if offsets required
 if (Target > 0) {
+    # calculate the number of offset sites available to select from based on PercAvail
+    if (PercAvail < 100) {
+      if (PercAvail == 0) {
+        NumAvail = 1
+        NumAvailB = 1
+      } else {
+        NumAvail = ceiling(PercAvail * length(which(!is.na(OffArea.df))) / 100)
+        NumAvailB = ceiling(PercAvail * length(which(!is.na(OffAreaB.df))) / 100)
+      }
+    } else {
+      NumAvail = length(which(!is.na(OffArea.df)))
+      NumAvailB = length(which(!is.na(OffAreaB.df)))
+    }
 
     # get cost effectiveness - hectares purchased per $1000
     CostE <- 1000 / Costs
@@ -165,6 +198,13 @@ if (Target > 0) {
     #consider only those areas where an offset is possible
     CostE[which(is.na(OffArea.df))] <- NA
     CostEB[which(is.na(OffAreaB.df))] <- NA
+
+    # get a random sample of the potential offset sites based on the percent available
+    # set ones that are not available to NA
+    if (NumAvail < length(which(!is.na(OffArea.df)))) {
+      CostE[sample(which(!is.na(CostE)), length(which(!is.na(OffArea.df))) - NumAvail)] <- NA
+      CostEB[sample(which(!is.na(CostEB)), length(which(!is.na(OffAreaB.df))) - NumAvailB)] <- NA
+    }
 
     # get order based on cost effectiveness
     Order <- order(CostE, OffArea.df, decreasing = TRUE, na.last = TRUE)
@@ -179,7 +219,6 @@ if (Target > 0) {
 
     # there is enough area for restoration needed
     if (max(SortAreasSum, na.rm = TRUE) >= Target) {
-
       #  get the closest value that is at least as large as the target
       DiffTarg <- (SortAreasSum - Target) ^ 2
       MinIndex <- which.min(DiffTarg)
@@ -238,7 +277,7 @@ if (Target > 0) {
   }
 }
 
-RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon) {
+RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon) {
 
   # determine where is protected, where impacts can be offset, and where offset sites can be located under the previous or current regulation/policy
   if (Reg == "previous") {
@@ -329,7 +368,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Ho
   # create data frame version of LGA and existing urban layer
   LGAExistUrb.df <- as.data.frame(LGAExistUrb)
   names(LGAExistUrb.df) <- "LGAExistUrb"
-  # create data from to hold simulated dwelling growth for each LGA urban/non-urban combination
+  # create data to hold simulated dwelling growth for each LGA urban/non-urban combination
   DwellGrowthReport <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Growth0" = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0))
   # create vector to hold tests of whether dwelling targets have been met or not
   TargetTest <- c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
@@ -407,7 +446,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Ho
   for (i in 1:MaxIter) {
 
     # constraints on transition to 51, 52, and 53 where dwelling targets already met
-    # if some targets met then adjust constraints so we get no further transitions to 51, 52, and 52
+    # if some targets met then adjust constraints so we get no further transitions to 51, 52, and 53
     if (length(which(TargetTest == 1)) > 0) {
         for (j in which(TargetTest == 1)) {
           TargetCons[which((TargetCons[,"LGAExistUrb"] == j) & (lucurr.df[,"lucurr"] != 51)), "51"] <- 0
@@ -494,8 +533,8 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Ho
         # get amount of tree loss in sites that need offsetting in each LGA
         TreeLostOffLGA <- zonal(to_raster(KoalaTreeLostOff.df$KoalaTreeLost, lucurr), lgasfact, fun = 'sum')
 
-        # get allocation in LGA
-        Allocation <- apply(matrix(c(1, 2, 3, 4, 5, 6, 7, 8), nrow = 8, ncol = 1), MARGIN = 1, FUN = function(x){get_off_sites_lga(x, Lgas.df = lgasfact.df$lgasfact, OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, Target =  TreeLostOffLGA[x,2] * Multiplier)})
+        # get allocation in each LGA
+        Allocation <- apply(matrix(c(1, 2, 3, 4, 5, 6, 7, 8), nrow = 8, ncol = 1), MARGIN = 1, FUN = function(x){get_off_sites_lga(x, Lgas.df = lgasfact.df$lgasfact, OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  TreeLostOffLGA[x,2] * Multiplier)})
 
         # increment offset costs
         OffCost <- OffCost + sum(unlist(lapply(Allocation, FUN = function(x){x$Cost})))
@@ -526,7 +565,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Ho
           RestoreOppB.df[which((!((OffSiteB.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30) | (NewLU.df == 40)))) | (RestoreOppB.df <= 0)), "RestoreOppB"] <- NA
 
           # get allocation anywhere
-          Allocation2 <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, Target =  Remaining)
+          Allocation2 <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  Remaining)
 
           # increment offset costs
           OffCost <- OffCost + Allocation2$Cost
@@ -554,7 +593,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Ho
       } else if (OffRule == "anywhere") {
       # anywhere rule
         # get allocation anywhere
-        Allocation <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, Target =  sum(KoalaTreeLostOff.df, na.rm = TRUE) * Multiplier)
+        Allocation <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  sum(KoalaTreeLostOff.df, na.rm = TRUE) * Multiplier)
 
         # increment offset costs
         OffCost <- OffCost + Allocation$Cost
