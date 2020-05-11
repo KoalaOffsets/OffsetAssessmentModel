@@ -70,20 +70,6 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Perc
 
   # check if offsets required
   if (Target > 0) {
-    # calculate the number of offset sites available to select from based on PercAvail
-    if (PercAvail < 100) {
-      if (PercAvail == 0) {
-        NumAvail = 1
-        NumAvailB = 1
-      } else {
-        NumAvail = ceiling(PercAvail * length(which(!is.na(OffArea.df))) / 100)
-        NumAvailB = ceiling(PercAvail * length(which(!is.na(OffAreaB.df))) / 100)
-      }
-    } else {
-      NumAvail = length(which(!is.na(OffArea.df)))
-      NumAvailB = length(which(!is.na(OffAreaB.df)))
-    }
-
     # get cost effectiveness - hectares purchased per $1000
     CostE <- 1000 / Costs
     CostEB <- 1000 / Costs
@@ -92,20 +78,22 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Perc
     CostE[which(is.na(OffArea.df))] <- NA
     CostEB[which(is.na(OffAreaB.df))] <- NA
 
-    # get a random sample of the potential offset sites based on the percent available
-    # set ones that are not available to NA
-    if (NumAvail < length(which(!is.na(OffArea.df)))) {
-      CostE[sample(which(!is.na(CostE)), length(which(!is.na(OffArea.df))) - NumAvail)] <- NA
-      CostEB[sample(which(!is.na(CostEB)), length(which(!is.na(OffAreaB.df))) - NumAvailB)] <- NA
-    }
-
     # get order of priority based on cost effectiveness
     Order <- order(CostE, OffArea.df, decreasing = TRUE, na.last = TRUE)
     OrderB <- order(CostEB, OffAreaB.df, decreasing = TRUE, na.last = TRUE)
+    OrderLGA <- Order[which((Lgas.df[Order] == Lga) & (!is.na(OffArea.df[Order])))]
+    OrderBLGA <- OrderB[which((Lgas.df[OrderB] == Lga) & (!is.na(OffAreaB.df[OrderB])))]
 
-    OrderLGA <- Order[which(Lgas.df[Order] == Lga)]
-    OrderBLGA <- OrderB[which(Lgas.df[OrderB] == Lga)]
+    # get a random sample of the potential offset sites based on the percent available
+    # but maintain the same order
+    if (PercAvail < 100) {
+      NumAvail = ceiling(PercAvail * length(OrderLGA) / 100)
+      NumAvailB = ceiling(PercAvail * length(OrderBLGA) / 100)
+      OrderLGA <- OrderLGA[sort(sample.int(length(OrderLGA), NumAvail))]
+      OrderBLGA <- OrderBLGA[sort(sample.int(length(OrderBLGA), NumAvailB))]
+    }
 
+    # get the ordered areas of potential offset sites
     SortAreasLGA <- OffArea.df[OrderLGA]
     SortAreasBLGA <- OffAreaB.df[OrderBLGA]
 
@@ -114,8 +102,8 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Perc
     SortAreasBSumLGA <- cumsum(SortAreasBLGA)
 
     # there is enough area for restoration needed in LGA
-    if (max(SortAreasSumLGA, na.rm = TRUE) >= Target) {
-      # get the closest value that is at least as large as the target
+    if (if (length(SortAreasSumLGA) > 0) {max(SortAreasSumLGA, na.rm = TRUE) >= Target} else {FALSE}) {
+      # get the closest value to the target
       DiffTarg <- (SortAreasSumLGA - Target) ^ 2
       MinIndex <- which.min(DiffTarg)
 
@@ -128,13 +116,15 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Perc
     # not enough area for restoration so use the backup
     else {
       # get all allocations in the offset sites area
-      Needed1 <- OrderLGA[1:which.max(SortAreasSumLGA)]
-
+      if (length(SortAreasSumLGA) > 0) {
+        Needed1 <- OrderLGA[1:which.max(SortAreasSumLGA)]
+      } else {
+        Needed1 <- vector()
+      }
       # there is enough area for restoration needed in LGA in the backup area
-      if (max(SortAreasBSumLGA, na.rm = TRUE) >= (Target - max(SortAreasSumLGA, na.rm = TRUE))) {
-
-        #  get the closest value that is at least as large as the target for the Backup sites
-        DiffTarg <- (SortAreasBSumLGA - (Target - max(SortAreasSumLGA, na.rm = TRUE))) ^ 2
+      if (if (length(SortAreasBSumLGA) > 0) {max(SortAreasBSumLGA, na.rm = TRUE) >= (Target - (if (length(SortAreasSumLGA) > 0) {max(SortAreasSumLGA, na.rm = TRUE)} else {0}))} else {FALSE}) {
+        # get the closest value to the target for the Backup sites
+        DiffTarg <- (SortAreasBSumLGA - (Target - (if (length(SortAreasSumLGA) > 0) {max(SortAreasSumLGA, na.rm = TRUE)} else {0}))) ^ 2
         MinIndex <- which.min(DiffTarg)
 
         # allocate needed in backup sites
@@ -145,8 +135,16 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Perc
       }
       else {
         # get all allocations in the offset sites backup area
-        Needed2 <- OrderBLGA[1:which.max(SortAreasBSumLGA)]
-        Areas <- c(OffArea.df[Needed1], OffAreaB.df[Needed2])
+        if (length(SortAreasBSumLGA) > 0) {
+          Needed2 <- OrderBLGA[1:which.max(SortAreasBSumLGA)]
+        } else {
+          Needed2 <- vector()
+        }
+        if ((length(Needed1) > 0) | (length(Needed2) > 0)) {
+          Areas <- c(OffArea.df[Needed1], OffAreaB.df[Needed2])
+        } else {
+          Areas <- vector()
+        }
         Left <- Target - sum(Areas, na.rm = T)
         ExitFlag <- -1
       }
@@ -161,36 +159,22 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, Perc
     Cost <- sum((Costs[Needed] + 90901 + 14600) * Areas, na.rm = TRUE) # restoration costs from Rhodes et al. (2019)
 
     # get output
-    Output <- list(Needed, NotAlloc, Cost, ExitFlag)
-    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "ExitFlag")
+    Output <- list(Needed, NotAlloc, Cost, OrderLGA, OrderBLGA, ExitFlag)
+    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "Order", "OrderB", "ExitFlag")
     return(Output)
   } else {
     # get output
-    Output <- list(vector(), 0, 0, 1)
-    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "ExitFlag")
+    Output <- list(vector(), Target, 0, vector(), vector(), 1)
+    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "Order", "OrderB", "ExitFlag")
     return(Output)
   }
 }
 
-# function to allocate offset sites in an LGA - returns the indices of allocated sites, the cost of land purchase, and any remaining impacts not offset yet
+# function to allocate offset sites anywhere - returns the indices of allocated sites, the cost of land purchase, and any remaining impacts not offset yet
 get_off_sites_anywhere <- function(OffArea.df, OffAreaB.df, Costs, PercAvail, Target) {
 
-# check if offsets required
-if (Target > 0) {
-    # calculate the number of offset sites available to select from based on PercAvail
-    if (PercAvail < 100) {
-      if (PercAvail == 0) {
-        NumAvail = 1
-        NumAvailB = 1
-      } else {
-        NumAvail = ceiling(PercAvail * length(which(!is.na(OffArea.df))) / 100)
-        NumAvailB = ceiling(PercAvail * length(which(!is.na(OffAreaB.df))) / 100)
-      }
-    } else {
-      NumAvail = length(which(!is.na(OffArea.df)))
-      NumAvailB = length(which(!is.na(OffAreaB.df)))
-    }
-
+  # check if offsets required
+  if (Target > 0) {
     # get cost effectiveness - hectares purchased per $1000
     CostE <- 1000 / Costs
     CostEB <- 1000 / Costs
@@ -199,17 +183,22 @@ if (Target > 0) {
     CostE[which(is.na(OffArea.df))] <- NA
     CostEB[which(is.na(OffAreaB.df))] <- NA
 
-    # get a random sample of the potential offset sites based on the percent available
-    # set ones that are not available to NA
-    if (NumAvail < length(which(!is.na(OffArea.df)))) {
-      CostE[sample(which(!is.na(CostE)), length(which(!is.na(OffArea.df))) - NumAvail)] <- NA
-      CostEB[sample(which(!is.na(CostEB)), length(which(!is.na(OffAreaB.df))) - NumAvailB)] <- NA
-    }
-
     # get order based on cost effectiveness
     Order <- order(CostE, OffArea.df, decreasing = TRUE, na.last = TRUE)
     OrderB <- order(CostEB, OffAreaB.df, decreasing = TRUE, na.last = TRUE)
+    Order <- Order[which(!is.na(OffArea.df[Order]))]
+    OrderB <- OrderB[which(!is.na(OffAreaB.df[OrderB]))]
 
+    # get a random sample of the potential offset sites based on the percent available
+    # but maintain the same order
+    if (PercAvail < 100) {
+      NumAvail = ceiling(PercAvail * length(Order) / 100)
+      NumAvailB = ceiling(PercAvail * length(OrderB) / 100)
+      Order <- Order[sort(sample.int(length(Order), NumAvail))]
+      OrderB <- OrderB[sort(sample.int(length(OrderB), NumAvailB))]
+    }
+
+    # get the ordered areas of potential offset sites
     SortAreas <- OffArea.df[Order]
     SortAreasB <- OffAreaB.df[OrderB]
 
@@ -218,8 +207,8 @@ if (Target > 0) {
     SortAreasBSum <- cumsum(SortAreasB)
 
     # there is enough area for restoration needed
-    if (max(SortAreasSum, na.rm = TRUE) >= Target) {
-      #  get the closest value that is at least as large as the target
+    if (if (length(SortAreasSum) > 0) {max(SortAreasSum, na.rm = TRUE) >= Target} else {FALSE}) {
+      #  get the closest value to the target
       DiffTarg <- (SortAreasSum - Target) ^ 2
       MinIndex <- which.min(DiffTarg)
 
@@ -232,13 +221,16 @@ if (Target > 0) {
     # not enough area for restoration so use the backup
     else {
       # get all allocations in the offset sites area
-      Needed1 <- Order[1:which.max(SortAreasSum)]
+      if (length(SortAreasSum) > 0) {
+        Needed1 <- Order[1:which.max(SortAreasSum)]
+      } else {
+        Needed1 <- vector()
+      }
 
       # there is enough area for restoration needed in the backup area
-      if (max(SortAreasBSum, na.rm = TRUE) >= (Target - max(SortAreasSum, na.rm = TRUE))) {
-
-        #  get the closest value that is at least as large as the target for the Backup sites
-        DiffTarg <- (SortAreasBSum - (Target - max(SortAreasSum, na.rm = TRUE))) ^ 2
+      if (if (length(SortAreasBSum) > 0) {max(SortAreasBSum, na.rm = TRUE) >= (Target - (if (length(SortAreasSum) > 0) {max(SortAreasSum, na.rm = TRUE)} else {0}))} else {FALSE}) {
+        #  get the closest value to the target for the Backup sites
+        DiffTarg <- (SortAreasBSum - (Target - (if (length(SortAreasSum) > 0) {max(SortAreasSum, na.rm = TRUE)} else {0}))) ^ 2
         MinIndex <- which.min(DiffTarg)
 
         # allocate needed in backup sites
@@ -249,8 +241,16 @@ if (Target > 0) {
       }
       else {
         # get all allocations in the offset sites backup area
-        Needed2 <- OrderB[1:which.max(SortAreasBSum)]
-        Areas <- c(OffArea.df[Needed1], OffAreaB.df[Needed2])
+        if (length(SortAreasBSum) > 0) {
+          Needed2 <- OrderB[1:which.max(SortAreasBSum)]
+        } else {
+          Needed2 <- vector()
+        }
+        if ((length(Needed1) > 0) | (length(Needed2) > 0)) {
+          Areas <- c(OffArea.df[Needed1], OffAreaB.df[Needed2])
+        } else {
+          Areas <- vector()
+        }
         Left <- Target - sum(Areas, na.rm = T)
         ExitFlag <- -1
       }
@@ -265,14 +265,14 @@ if (Target > 0) {
     Cost <- sum((Costs[Needed] + 90901 + 14600) * Areas, na.rm = TRUE) # restoration costs from Rhodes et al. (2019)
 
     # get output
-    Output <- list(Needed, NotAlloc, Cost, ExitFlag)
-    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "ExitFlag")
+    Output <- list(Needed, NotAlloc, Cost, Order, OrderB, ExitFlag)
+    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "Order", "OrderB", "ExitFlag")
     return(Output)
   }
   else {
     # get output
-    Output <- list(vector(), 0, 0, 1)
-    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "ExitFlag")
+    Output <- list(vector(), Target, 0, vector(), vector(), 1)
+    names(Output) <- c("OffsetLoc", "NotAlloc", "Cost", "Order", "OrderB", "ExitFlag")
     return(Output)
   }
 }
@@ -296,7 +296,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
     names(Prot) <- "Prot"
     ProtInv <- reclassify(Prot, matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2))
     names(ProtInv) <- "ProtInv"
-    ImpOff <- HabNotKpa * ProtInv *  * KraInv # areas where impacts to be offset
+    ImpOff <- HabNotKpa * ProtInv * KraInv # areas where impacts to be offset
     names(ImpOff) <- "ImpOff"
     OffSite <- RestKpa # areas for offset sites
     names(OffSite) <- "OffSite"
@@ -440,6 +440,8 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   NotAllocated <- 0
   NotAllocatedList <- list()
   NotAllocatedList[[1]] <- 0
+  RemainingLGA <- c(0,0,0,0,0,0,0,0) # the area of offsets remaining unallocated in each LGA
+  Remaining <- 0 # the area of offsets remaining unallocated in total
 
   #loop through iterations to run simulation
 
@@ -470,12 +472,14 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
     # 3. Medium density urban (52) cannot transition to low density urban (51), rural residential (40), grazing (21), crops (22), or transition (23)
     # 4. High density urban (53) cannot transition to Medium density urban (52), low density urban (51), rural residential (40), grazing (21), crops (22), or transition (23)
     # 5. Commercial (60) cannot transition to rural residential (40), grazing (21), crops (22), or transition (23)
+    # 6. Intensive agriculture (71) cannot transition to grazing (21), crops (22), or transition (23)
     # 6. Industrial (72) cannot transition to rural residential (40), grazing (21), crops (22), or transition (23)
     Predictions[[4]] <- set_trans_zero(Predictions[[4]], c("21","22","23"))
     Predictions[[5]] <- set_trans_zero(Predictions[[5]], c("40","21","22","23"))
     Predictions[[6]] <- set_trans_zero(Predictions[[6]], c("51","40","21","22","23"))
     Predictions[[7]] <- set_trans_zero(Predictions[[7]], c("52","51","40","21","22","23"))
     Predictions[[8]] <- set_trans_zero(Predictions[[8]], c("40","21","22","23"))
+    Predictions[[9]] <- set_trans_zero(Predictions[[9]], c("21","22","23"))
     Predictions[[10]] <- set_trans_zero(Predictions[[10]], c("40","21","22","23"))
 
     # simulate transitions
@@ -519,13 +523,13 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
       # get offset impacts
       KoalaTreeLostOff.df <- KoalaTreeLost.df
       KoalaTreeLostOff.df$KoalaTreeLost[which(ImpOff.df$ImpOff == 0)] <- 0
-      # get the opportunities and back-up opportunities for the amount of koala habitat that could be restored in places that are in the permitted restoration areas and are of land uses 10, 21, 22, 23, 30, 40
+      # get the opportunities and back-up opportunities for the amount of koala habitat that could be restored in places that are in the permitted restoration areas and are of land uses 10, 21, 22, 23, 30
       RestoreOpp.df <- (HabCorePre.df + HabNonCorePre.df) - (HabCore.df + HabNonCore.df)
       names(RestoreOpp.df) <- "RestoreOpp"
-      RestoreOpp.df[which((!((OffSite.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30) | (NewLU.df == 40)))) | (RestoreOpp.df <= 0)), "RestoreOpp"] <- NA
+      RestoreOpp.df[which((!((OffSite.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30)))) | (RestoreOpp.df <= 0)), "RestoreOpp"] <- NA
       RestoreOppB.df <- (HabCorePre.df + HabNonCorePre.df) - (HabCore.df + HabNonCore.df)
       names(RestoreOppB.df) <- "RestoreOppB"
-      RestoreOppB.df[which((!((OffSiteB.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30) | (NewLU.df == 40)))) | (RestoreOppB.df <= 0)), "RestoreOppB"] <- NA
+      RestoreOppB.df[which((!((OffSiteB.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30)))) | (RestoreOppB.df <= 0)), "RestoreOppB"] <- NA
 
       # Allocate offset sites based on the cheapest to most expensive. First try to allocate to the offset locations and then try to allocate to the backup locations.
       if (OffRule == "lga") {
@@ -534,7 +538,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
         TreeLostOffLGA <- zonal(to_raster(KoalaTreeLostOff.df$KoalaTreeLost, lucurr), lgasfact, fun = 'sum')
 
         # get allocation in each LGA
-        Allocation <- apply(matrix(c(1, 2, 3, 4, 5, 6, 7, 8), nrow = 8, ncol = 1), MARGIN = 1, FUN = function(x){get_off_sites_lga(x, Lgas.df = lgasfact.df$lgasfact, OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  TreeLostOffLGA[x,2] * Multiplier)})
+        Allocation <- apply(matrix(c(1, 2, 3, 4, 5, 6, 7, 8), nrow = 8, ncol = 1), MARGIN = 1, FUN = function(x){get_off_sites_lga(x, Lgas.df = lgasfact.df$lgasfact, OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOppB.df$RestoreOppB, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  TreeLostOffLGA[x,2] * Multiplier + RemainingLGA[x])})
 
         # increment offset costs
         OffCost <- OffCost + sum(unlist(lapply(Allocation, FUN = function(x){x$Cost})))
@@ -547,25 +551,36 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
         Prot.df$Prot[OffIndex] <- 1
         OffSite.df$OffSite[OffIndex] <- 0
         OffSiteB.df$OffSiteB[OffIndex] <- 0
-        HabCore.df$HabCore[OffIndex] <- (HabCorePre.df$HabCorePre[OffIndex] * Success) + (HabCore.df$HabCore[OffIndex] * ( 1- Success))
-        HabNonCore.df$HabNonCore[OffIndex] <- (HabNonCorePre.df$HabNonCorePre[OffIndex] * Success) + (HabNonCore.df$HabNonCore[OffIndex] * ( 1- Success))
+        HabCore.df$HabCore[OffIndex] <- (HabCorePre.df$HabCorePre[OffIndex] * Success) + (HabCore.df$HabCore[OffIndex] * ( 1 - Success))
+        HabNonCore.df$HabNonCore[OffIndex] <- (HabNonCorePre.df$HabNonCorePre[OffIndex] * Success) + (HabNonCore.df$HabNonCore[OffIndex] * ( 1 - Success))
 
         # get the remaining area needed after allocation within LGAs
-        Remaining <- sum(unlist(lapply(Allocation, FUN = function(x){x$NotAlloc})))
-        ExitF <- any(unlist(lapply(Allocation, FUN = function(x){x$NotAlloc})) == -1)
+        RemainingLGA <- unlist(lapply(Allocation, FUN = function(x){x$NotAlloc}))
+        Remaining <- sum(RemainingLGA)
+
+        # get the selection set IDs for potential offset sites chosen
+        OffSel <- unlist(lapply(Allocation, FUN = function(x){x$Order}))
+        OffSelB <- unlist(lapply(Allocation, FUN = function(x){x$OrderB}))
+
+        # get the exit flag
+        ExitF <- unlist(lapply(Allocation, FUN = function(x){x$ExitFlag}))
 
         # allocate remaining anywhere
-        if ((Remaining > 0) & (ExitF == TRUE)) {
-          # get the new opportunities and back-up opportunities for the amount of koala habitat that could be restored in places that are in the permitted restoration areas and are of land uses 10, 21, 22, 23, 30, 40
+        if (any(ExitF == -1)) {
+          # get the new opportunities and back-up opportunities for the amount of koala habitat that could be restored in places that are in the permitted restoration areas and are of land uses 10, 21, 22, 23, 30
           RestoreOpp.df <- (HabCorePre.df + HabNonCorePre.df) - (HabCore.df + HabNonCore.df)
           names(RestoreOpp.df) <- "RestoreOpp"
-          RestoreOpp.df[which((!((OffSite.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30) | (NewLU.df == 40)))) | (RestoreOpp.df <= 0)), "RestoreOpp"] <- NA
+          RestoreOpp.df[which((!((OffSite.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30)))) | (RestoreOpp.df <= 0)), "RestoreOpp"] <- NA
           RestoreOppB.df <- (HabCorePre.df + HabNonCorePre.df) - (HabCore.df + HabNonCore.df)
           names(RestoreOppB.df) <- "RestoreOppB"
-          RestoreOppB.df[which((!((OffSiteB.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30) | (NewLU.df == 40)))) | (RestoreOppB.df <= 0)), "RestoreOppB"] <- NA
+          RestoreOppB.df[which((!((OffSiteB.df == 1) & ((NewLU.df == 10) | (NewLU.df == 21) | (NewLU.df == 22) | (NewLU.df == 23) | (NewLU.df == 30)))) | (RestoreOppB.df <= 0)), "RestoreOppB"] <- NA
 
-          # get allocation anywhere
-          Allocation2 <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  Remaining)
+          # make only the sites that were available in the LGA selections available for offsets in the anywhere selection
+          RestoreOpp.df[-OffSel,"RestoreOpp"] <- NA
+          RestoreOppB.df[-OffSelB, "RestorOppB"] <- NA
+
+          # get allocation anywhere based on thwe sites available everywhere
+          Allocation2 <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOppB.df$RestoreOppB, Costs = LandVal.df$LandVal, PercAvail = 100, Target =  sum(RemainingLGA[which(ExitF == -1)]))
 
           # increment offset costs
           OffCost <- OffCost + Allocation2$Cost
@@ -577,11 +592,12 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
           Prot.df$Prot[OffIndex2] <- 1
           OffSite.df$OffSite[OffIndex2] <- 0
           OffSiteB.df$OffSiteB[OffIndex2] <- 0
-          HabCore.df$HabCore[OffIndex2] <- (HabCorePre.df$HabCorePre[OffIndex2] * Success) + (HabCore.df$HabCore[OffIndex2] * ( 1- Success))
+          HabCore.df$HabCore[OffIndex2] <- (HabCorePre.df$HabCorePre[OffIndex2] * Success) + (HabCore.df$HabCore[OffIndex2] * ( 1 - Success))
           HabNonCore.df$HabNonCore[OffIndex2] <- (HabNonCorePre.df$HabNonCorePre[OffIndex2] * Success) + (HabNonCore.df$HabNonCore[OffIndex2] * ( 1 - Success))
 
           # get the remaining area needed after allocation within LGAs
-          Remaining <- Allocation2$NotAlloc
+          RemainingLGA[which(ExitF == -1)] <- RemainingLGA[which(ExitF == -1)] * (Allocation2$NotAlloc / sum(RemainingLGA[which(ExitF == -1)]))
+          Remaining <- Remaining + Allocation2$NotAlloc
 
           # combine allocations and offset indices
           Allocation <- c(Allocation, list(Allocation2))
@@ -589,11 +605,11 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
         }
 
         # update the area of offsets not allocated
-        NotAllocated <- NotAllocated + Remaining
+        NotAllocated <- Remaining
       } else if (OffRule == "anywhere") {
       # anywhere rule
         # get allocation anywhere
-        Allocation <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOpp.df$RestoreOpp, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  sum(KoalaTreeLostOff.df, na.rm = TRUE) * Multiplier)
+        Allocation <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOppB.df$RestoreOppB, Costs = LandVal.df$LandVal, PercAvail = PercAvail, Target =  sum(KoalaTreeLostOff.df, na.rm = TRUE) * Multiplier + Remaining)
 
         # increment offset costs
         OffCost <- OffCost + Allocation$Cost
@@ -613,7 +629,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
         Remaining <-  Allocation$NotAlloc
 
         # update the area of offsets not allocated
-        NotAllocated <- NotAllocated + Remaining
+        NotAllocated <- Remaining
       }
     }
 
@@ -763,7 +779,7 @@ Pda <- raster("input/maps/pda_fin.asc") # koala habitat not protected nor offset
 PdaInv <- reclassify(Pda, matrix(c(0,1,1,0),nrow=2,ncol=2))
 Kra <- raster("input/maps/krafin.asc") # koala habitat not protected nor offsets required - Key Resource Area
 KraInv <- reclassify(Kra, matrix(c(0,1,1,0),nrow=2,ncol=2))
-LandVal <- (raster("input/maps/lvalsimf.asc") + 1) # unimproved land value from 2012 (QVAS data) - here add $1 to avoid zeros. Here have estimated missing or zero values using an inverse distance weighted interpolation (exponential with exponent 2 which had the lowest RMS) and assumed national parks and state land had land vlaues of zero to relfect cost to the state government.
+LandVal <- (raster("input/maps/lvalsimf.asc") + 1) # unimproved land value from 2012 (QVAS data) - here add $1 to avoid zeros. Here have estimated missing or zero values using an inverse distance weighted interpolation (exponential with exponent 2 which had the lowest RMS) and assumed national parks and state land had land values of zero to reflect cost to the state government.
 
 # apply names
 names(lu1999) <- "lu1999"
@@ -805,8 +821,29 @@ names(LandVal) <- "LandVal"
 ## SET UP AND RUN SCENARIOS
 
 # set up parallel processing
-cl <- makeCluster(4)  # initiate parallel computing
-registerDoParallel(cl)  # use multicore, set to the number of our cores
+#cl <- makeCluster(4)  # initiate parallel computing
+#registerDoParallel(cl)  # use multicore, set to the number of our cores
+
+# SCENARIO TEST
+MaxIter <- 1000
+RepSteps <- 1 # how often (how many iterations) to report and record outputs
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+
+
+
+foreach (i = 1:4, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
+  rm(Test)
+  gc()
+  NA
+}
 
 # SCENARIO 1 - no regulation and no offsets
 MaxIter <- 1000
@@ -815,6 +852,7 @@ Reg <- "none" # "none", or "previous", or "current" regulation ("none" means no 
 OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
 Multiplier <- 3 # the multiplier applied
 RestSucc <- 0.9 # probability that restoration succeeds
+
 Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
 
 foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
