@@ -779,7 +779,9 @@ Pda <- raster("input/maps/pda_fin.asc") # koala habitat not protected nor offset
 PdaInv <- reclassify(Pda, matrix(c(0,1,1,0),nrow=2,ncol=2))
 Kra <- raster("input/maps/krafin.asc") # koala habitat not protected nor offsets required - Key Resource Area
 KraInv <- reclassify(Kra, matrix(c(0,1,1,0),nrow=2,ncol=2))
-LandVal <- (raster("input/maps/lvalsimf.asc") + 1) # unimproved land value from 2012 (QVAS data) - here add $1 to avoid zeros. Here have estimated missing or zero values using an inverse distance weighted interpolation (exponential with exponent 2 which had the lowest RMS) and assumed national parks and state land had land values of zero to reflect cost to the state government.
+LandVal <- raster("input/maps/lvalsimf.asc") # unimproved land value from 2012 (QVAS data). Here have estimated missing or zero values using an inverse distance weighted interpolation (exponential with exponent 2 which had the lowest RMS) and assumed national parks and state land had land values of zero to reflect actual cost to the State Government.
+LVChange <- read.csv("input/table/landval_change.csv", header = TRUE) # increase in land values fromm 2012 to 2019 for each LGA as sourced from https://www.data.qld.gov.au/dataset/historical-trends-in-land-valuations/resource/03f430d3-de9b-44ba-bc8b-a147ad00c080
+LandVal <- to_raster(as.data.frame(LandVal)$lvalsimf * (as.data.frame(lgasfact) %>% left_join(LVChange, by = c("lgas" = "LGA")))$Change + 1, lu2016) # increase land values by the increase in unimproved land values between 2012 and 2019
 
 # apply names
 names(lu1999) <- "lu1999"
