@@ -397,8 +397,14 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   names(lucurr.df) <- "lucurr"
 
   # set up habitat data frames
+  HabHM.df <- as.data.frame(HabHM)
+  HabML.df <- as.data.frame(HabML)
+  HabVL.df <- as.data.frame(HabVL)
   HabCore.df <- as.data.frame(HabCore)
   HabNonCore.df <- as.data.frame(HabNonCore)
+  HabHMPre.df <- as.data.frame(HabHMPre)
+  HabMLPre.df <- as.data.frame(HabMLPre)
+  HabVLPre.df <- as.data.frame(HabVLPre)
   HabCorePre.df <- as.data.frame(HabCorePre)
   HabNonCorePre.df <- as.data.frame(HabNonCorePre)
 
@@ -425,8 +431,14 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   OffsetSitesList <- list()
   OffsetSitesList[[1]] <- OffsetSites
   # habitat raters
+  HabHMList <- list()
+  HabMLList <- list()
+  HabVLList <- list()
   HabCoreList <- list()
   HabNonCoreList <- list()
+  HabHMList[[1]] <- HabHM
+  HabMLList[[1]] <- HabML
+  HabVLList[[1]] <- HabVL
   HabCoreList[[1]] <- HabCore
   HabNonCoreList[[1]] <- HabNonCore
   # koala numbers raster
@@ -512,6 +524,12 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
     names(KoalaTreeLost.df) <- "KoalaTreeLost"
 
     # get new habitat amounts without offsets
+    HabHM.df <- HabHM.df * (1 - HabLoss.df)
+    names(HabHM.df) <- "HabHM"
+    HabML.df <- HabML.df * (1 - HabLoss.df)
+    names(HabML.df) <- "HabML"
+    HabVL.df <- HabVL.df * (1 - HabLoss.df)
+    names(HabVL.df) <- "HabVL"
     HabCore.df <- HabCore.df * (1 - HabLoss.df)
     names(HabCore.df) <- "HabCore"
     HabNonCore.df <- HabNonCore.df * (1 - HabLoss.df)
@@ -543,14 +561,19 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
         # increment offset costs
         OffCost <- OffCost + sum(unlist(lapply(Allocation, FUN = function(x){x$Cost})))
 
-        # update offset locations, impact and offset sites, protected areas, and offset area, and core and non core habitat
+        # update offset locations, impact and offset sites, protected areas, and offset area, and habitat areas
         OffIndex <- unlist(lapply(Allocation, FUN = function(x){x$OffsetLoc}))
         Success <- rbinom(length(OffIndex), 1, RestSucc) # whether the offset is successful or not
         OffsetImpactSites.df$OffsetImpactSites <- OffsetImpactSites.df$OffsetImpactSites + KoalaTreeLostOff.df$KoalaTreeLost
         OffsetSites.df$OffsetSites[OffIndex] <- OffsetSites.df$OffsetSites[OffIndex] + (((HabCorePre.df$HabCorePre[OffIndex] + HabNonCorePre.df$HabNonCorePre[OffIndex]) - (HabCore.df$HabCore[OffIndex] + HabNonCore.df$HabNonCore[OffIndex])) * Success)
+        # update protected status and availability for offsets at the offset sites
         Prot.df$Prot[OffIndex] <- 1
         OffSite.df$OffSite[OffIndex] <- 0
         OffSiteB.df$OffSiteB[OffIndex] <- 0
+        # update habitat areas
+        HabHM.df$HabHM[OffIndex] <- (HabHMPre.df$HabHMPre[OffIndex] * Success) + (HabHM.df$HabHM[OffIndex] * ( 1 - Success))
+        HabML.df$HabML[OffIndex] <- (HabMLPre.df$HabMLPre[OffIndex] * Success) + (HabML.df$HabML[OffIndex] * ( 1 - Success))
+        HabVL.df$HabVL[OffIndex] <- (HabVLPre.df$HabVLPre[OffIndex] * Success) + (HabVL.df$HabVL[OffIndex] * ( 1 - Success))
         HabCore.df$HabCore[OffIndex] <- (HabCorePre.df$HabCorePre[OffIndex] * Success) + (HabCore.df$HabCore[OffIndex] * ( 1 - Success))
         HabNonCore.df$HabNonCore[OffIndex] <- (HabNonCorePre.df$HabNonCorePre[OffIndex] * Success) + (HabNonCore.df$HabNonCore[OffIndex] * ( 1 - Success))
 
@@ -589,9 +612,14 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
           OffIndex2 <- Allocation2$OffsetLoc
           Success <- rbinom(length(OffIndex2), 1, RestSucc) # whether the offset is successful or not
           OffsetSites.df$OffsetSites[OffIndex2] <- OffsetSites.df$OffsetSites[OffIndex2] + (((HabCorePre.df$HabCorePre[OffIndex2] + HabNonCorePre.df$HabNonCorePre[OffIndex2]) - (HabCore.df$HabCore[OffIndex2] + HabNonCore.df$HabNonCore[OffIndex2])) * Success)
+          # update protected status and availability for offsets at the offset sites
           Prot.df$Prot[OffIndex2] <- 1
           OffSite.df$OffSite[OffIndex2] <- 0
           OffSiteB.df$OffSiteB[OffIndex2] <- 0
+          # update habitat areas
+          HabHM.df$HabHM[OffIndex2] <- (HabHMPre.df$HabHMPre[OffIndex2] * Success) + (HabHM.df$HabHM[OffIndex2] * ( 1 - Success))
+          HabML.df$HabML[OffIndex2] <- (HabMLPre.df$HabMLPre[OffIndex2] * Success) + (HabML.df$HabML[OffIndex2] * ( 1 - Success))
+          HabVL.df$HabVL[OffIndex2] <- (HabVLPre.df$HabVLPre[OffIndex2] * Success) + (HabVL.df$HabVL[OffIndex2] * ( 1 - Success))
           HabCore.df$HabCore[OffIndex2] <- (HabCorePre.df$HabCorePre[OffIndex2] * Success) + (HabCore.df$HabCore[OffIndex2] * ( 1 - Success))
           HabNonCore.df$HabNonCore[OffIndex2] <- (HabNonCorePre.df$HabNonCorePre[OffIndex2] * Success) + (HabNonCore.df$HabNonCore[OffIndex2] * ( 1 - Success))
 
@@ -619,9 +647,14 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
         Success <- rbinom(length(OffIndex), 1, RestSucc) # whether the offset is successful or not
         OffsetImpactSites.df$OffsetImpactSites <- OffsetImpactSites.df$OffsetImpactSites + KoalaTreeLostOff.df$KoalaTreeLost
         OffsetSites.df$OffsetSites[OffIndex] <- OffsetSites.df$OffsetSites[OffIndex] + (((HabCorePre.df$HabCorePre[OffIndex] + HabNonCorePre.df$HabNonCorePre[OffIndex]) - (HabCore.df$HabCore[OffIndex] + HabNonCore.df$HabNonCore[OffIndex])) * Success)
+        # update protected status and availability for offsets at the offset sites
         Prot.df$Prot[OffIndex] <- 1
         OffSite.df$OffSite[OffIndex] <- 0
         OffSiteB.df$OffSiteB[OffIndex] <- 0
+        # update habitat areas
+        HabHM.df$HabHM[OffIndex] <- (HabHMPre.df$HabHMPre[OffIndex] * Success) + (HabHM.df$HabHM[OffIndex] * ( 1 - Success))
+        HabML.df$HabML[OffIndex] <- (HabMLPre.df$HabMLPre[OffIndex] * Success) + (HabML.df$HabML[OffIndex] * ( 1 - Success))
+        HabVL.df$HabVL[OffIndex] <- (HabVLPre.df$HabVLPre[OffIndex] * Success) + (HabVL.df$HabVL[OffIndex] * ( 1 - Success))
         HabCore.df$HabCore[OffIndex] <- (HabCorePre.df$HabCorePre[OffIndex] * Success) + (HabCore.df$HabCore[OffIndex] * ( 1- Success))
         HabNonCore.df$HabNonCore[OffIndex] <- (HabNonCorePre.df$HabNonCorePre[OffIndex] * Success) + (HabNonCore.df$HabNonCore[OffIndex] * ( 1- Success))
 
@@ -646,6 +679,12 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
     }
 
     # record habitat in list
+    HabHMNew <- to_raster(HabHM.df$HabHM, lucurr)
+    names(HabHM) <- "HabHM"
+    HabMLNew <- to_raster(HabML.df$HabML, lucurr)
+    names(HabML)  <- "HabML"
+    HabVLNew <- to_raster(HabVL.df$HabVL, lucurr)
+    names(HabVL) <- "HabVL"
     HabCoreNew <- to_raster(HabCore.df$HabCore, lucurr)
     names(HabCoreNew) <- "HabCore"
     HabNonCoreNew <- to_raster(HabNonCore.df$HabNonCore, lucurr)
@@ -653,6 +692,9 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
     KNumNew <- KNum * (HabCoreNew + HabNonCoreNew)
     names(KNumNew) <- "KNum"
     if (i %% RepSteps == 0) {
+      HabHMList[[floor(i / RepSteps) + 1]] <- HabHMNew
+      HabMLList[[floor(i / RepSteps) + 1]] <- HabMLNew
+      HabVLList[[floor(i / RepSteps) + 1]] <- HabVLNew
       HabCoreList[[floor(i / RepSteps) + 1]] <- HabCoreNew
       HabNonCoreList[[floor(i / RepSteps) + 1]] <- HabNonCoreNew
       KNumList[[floor(i / RepSteps) + 1]] <- KNumNew
@@ -720,9 +762,12 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
           OffsetSitesList[[floor(i / RepSteps) + 2]] <- OffsetSites
           OffCostList[[floor(i / RepSteps) + 2]] <- OffCost
           NotAllocatedList[[floor(i / RepSteps) + 2]] <- NotAllocated
+          HabHMList[[floor(i / RepSteps) + 2]] <- HabHMNew
+          HabMLList[[floor(i / RepSteps) + 2]] <- HabMLNew
+          HabVLList[[floor(i / RepSteps) + 2]] <- HabVLNew
           HabCoreList[[floor(i / RepSteps) + 2]] <- HabCoreNew
           HabNonCoreList[[floor(i / RepSteps) + 2]] <- HabNonCoreNew
-          KNumList[[floor(i / RepSteps) + 1]] <- KNumNew
+          KNumList[[floor(i / RepSteps) + 2]] <- KNumNew
           DwellGrowthList[[floor(i / RepSteps) + 2]] <- DwellGrowth
           LandUseList[[floor(i / RepSteps) + 2]] <- lucurr
         }
@@ -730,8 +775,8 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
     }
   }
 
-  Output <- list(LandUseList, DwellGrowthList, HabCoreList, HabNonCoreList, KNumList, OffsetImpactSitesList, OffsetSitesList, OffCostList, NotAllocatedList)
-  names(Output) <- c("LandUse", "DwellNum", "HabCore", "HabNonCore", "KNum", "OffsetImpactSites", "OffsetSites", "OffCost", "NotAllocated")
+  Output <- list(LandUseList, DwellGrowthList, HabHMList, HabMLList, HabVLList, HabCoreList, HabNonCoreList, KNumList, OffsetImpactSitesList, OffsetSitesList, OffCostList, NotAllocatedList)
+  names(Output) <- c("LandUse", "DwellNum", "HabHM", "HabML", "HabVL", "HabCore", "HabNonCore", "KNum", "OffsetImpactSites", "OffsetSites", "OffCost", "NotAllocated")
 
   return(Output)
 }
@@ -743,8 +788,8 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
 ## Load maps, data, and lookup tables ####
 lu1999 <- raster("input/maps/landuse99reclsuburb4.asc") # land use in 1999
 lu2016 <- raster("input/maps/landuse16reclsuburb4.asc") # land use 2016
-plan2010 <- raster("input/maps/seq_planning_scheme_2010.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description - planning schemes for 2010
-plan2017 <- raster("input/maps/seq_planning_scheme_2017b.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description - planning schemes for 2017
+plan2010 <- raster("input/maps/seq_planning_scheme_2010.asc") # see: 04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description - planning schemes for 2010
+plan2017 <- raster("input/maps/seq_planning_scheme_2017b.asc") # see: 04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description - planning schemes for 2017
 plan2017tb <- read.csv("input/table/planningScheme2017.csv", header = TRUE) # planning scheme constraints table for 2017
 slope <- raster("input/maps/seq_slope.asc") # slope
 elev <- raster("input/maps/seq_dem.asc") # elevation
@@ -761,10 +806,16 @@ UFfacttb <- read.csv("input/table/shapingseq_cons.csv", header = TRUE) # Shaping
 lgasfact <- raster("input/maps/lgas.asc") # LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan]
 DwelDentb <- read.csv("input/table/change_dwellings.csv", header = TRUE) # changes in dwelling density / ha for each transitions (based on average dwelling densities in 2016 from the 2016 meshblocks)
 LGAExistUrb <- raster("input/maps/lgaexisturb.asc") # LGAs and whether existing urban areas or not 1 = LGA 1 not urban, 2 = LGA 1 urban, ...., 15 = LGA 8 not urban, 16 = LGA 8 urban. LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan] & existing urban areas as defined in Shaping SEQ [1 = existing urban area, 0 = not existing urban area]
-HabCore <- raster("input/maps/corehab.asc") # area of core habitat in each gird cell
-HabNonCore <- raster("input/maps/noncorehab.asc") #area of non-core habitat in each gird cell
-HabCorePre <- raster("input/maps/corehabpre.asc") # area of core habitat per clearing in each gird cell
-HabNonCorePre <- raster("input/maps/noncorehabpre.asc") # area of non-core habitat pre-clearing in each gird cell
+HabHM <- raster("input/maps/habhm.asc") # High to medium core habitat area - HSM rules 351, 341, 331, 350, 340, 330
+HabML <- raster("input/maps/habml.asc") # Medium to low core habitat area - HSM rules 251, 241, 231
+HabVL <- raster("input/maps/habvl.asc") # Very low core habitat area - HSM rules 250, 240, 230
+HabCore <- HabHM + HabML + HabVL # Total core habitat area
+HabNonCore <- raster("input/maps/habnc.asc") # Non-core habitat area - HSM rules 151, 150, 141, 146, 131, 130, 321, 320, 221, 220, 121
+HabHMPre <- raster("input/maps/habhmp.asc") # High to medium core habitat area pre-clearing - HSM rules 351, 341, 331, 350, 340, 330
+HabMLPre <- raster("input/maps/habmlp.asc") # Medium to low core habitat area pre-clearing - HSM rules 251, 241, 231
+HabVLPre <- raster("input/maps/habvlp.asc") # Very low core habitat area pre-clearing - HSM rules 250, 240, 230
+HabCorePre <- HabHMPre + HabMLPre + HabVLPre # Total core habitat area pre-clearing
+HabNonCorePre <- raster("input/maps/habncp.asc") # Non-core habitat area pre-clearing - HSM rules 151, 150, 141, 146, 131, 130, 321, 320, 221, 220, 121
 KNum <- raster("input/maps/denmod6f.asc") # koala density from Model 6 (Rhodes et al. 2015)
 KadaBOU <- raster("input/maps/kadabnurbf.asc") # koala habitat protected - bushland habitat in KADA area outside of the urban footprint and outside of urban use (urban use defined as classes 4, 36, 18, 10, 20, 23, 26, 27, 12, 2, 3, 14, 19, 1, 29, 13, 17, 22, 39, 6 in the 2017 planning scheme)
 PKadaB <- raster("input/maps/pkadabf.asc") # koala habitat protected - bushland habitat in PKADA
@@ -800,8 +851,14 @@ names(NeighInd) <- "NeighInd"
 names(UFfact) <- "UFfact"
 names(lgasfact) <- "lgasfact"
 names(LGAExistUrb) <- "LGAExistUrb"
+names(HabHM) <- "HabHM"
+names(HabML) <- "HabML"
+names(HabVL) <- "HabVL"
 names(HabCore) <- "HabCore"
 names(HabNonCore) <- "HabNonCore"
+names(HabHMPre) <- "HabHMPre"
+names(HabMLPre) <- "HabMLPre"
+names(HabVLPre) <- "HabVLPre"
 names(HabCorePre) <- "HabCorePre"
 names(HabNonCorePre) <- "HabNonCorePre"
 names(KNum) <- "KNum"
@@ -820,12 +877,6 @@ names(Kra) <- "Kra"
 names(KraInv) <- "KraInv"
 names(LandVal) <- "LandVal"
 
-## SET UP AND RUN SCENARIOS
-
-# set up parallel processing
-#cl <- makeCluster(4)  # initiate parallel computing
-#registerDoParallel(cl)  # use multicore, set to the number of our cores
-
 # SCENARIO TEST
 MaxIter <- 1000
 RepSteps <- 1 # how often (how many iterations) to report and record outputs
@@ -836,6 +887,45 @@ RestSucc <- 0.9 # probability that restoration succeeds
 PercAvail <- 100 # percent of potential offset sites available
 Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
 Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+
+
+## SET UP AND RUN SCENARIOS
+
+# scenarios
+# 1. No regulation (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
+# 2. Current regulation - no offsets (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
+# 3. Current regulation - offsets in LGAs (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
+# 4. Current regulation - offsets anywhere (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
+
+# set up parallel processing
+cl <- makeCluster(4)  # initiate parallel computing
+registerDoParallel(cl)  # use multicore, set to the number of our cores
+
+# HORIZON 2031
+
+# SCENARIO 1 - no regulation and no offsets
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Reg <- "none" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
+  rm(Test)
+  gc()
+  NA
+}
+
+# SCENARIO
+
+
+
+
+
 
 
 
@@ -854,9 +944,7 @@ Reg <- "none" # "none", or "previous", or "current" regulation ("none" means no 
 OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
 Multiplier <- 3 # the multiplier applied
 RestSucc <- 0.9 # probability that restoration succeeds
-
 Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-
 foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
   Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
   saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
