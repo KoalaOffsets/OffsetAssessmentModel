@@ -33,15 +33,15 @@ if(!is.null(dev.list())) dev.off()
 
 ## 1. CHECKING AND INSTALLING REQUIRED PACKAGES ========================
 
-if (!require("tidyr"))    install.packages("tidyr")   ; library("tidyr")
-if (!require("dplyr"))    install.packages("dplyr")   ; library("dplyr")
-if (!require("raster"))   install.packages("raster")  ; library("raster")
-if (!require("rJava"))    install.packages("rJava")   ; library("rJava")
-if (!require("raster"))   install.packages("raster")  ; library("raster")
-if (!require("RNetLogo")) install.packages("RNetLogo"); library("RNetLogo")
-if (!require("nnet"))     install.packages("nnet")    ; library("nnet")
-if (!require("grDevices"))install.packages("grDevices");library("grDevices")
-if (!require("diffeR"))   install.packages("diffeR")  ;library("diffeR")
+library("tidyr")
+library("dplyr")
+library("raster")
+library("rJava")
+library("raster")
+library("RNetLogo")
+library("nnet")
+library("grDevices")
+library("diffeR")
 
 ## 2. FUNCTIONS =====================================================
 
