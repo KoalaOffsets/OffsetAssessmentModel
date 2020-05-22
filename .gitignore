@@ -35,7 +35,7 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 
-# don't upload the data to GitHub
-data/
+# don't upload the input data to GitHub
+input/
 
 test\.txt
