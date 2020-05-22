@@ -3,8 +3,11 @@ library(foreign)
 library(data.table)
 library(tidyverse)
 
-## Set working directory (***CHANGE TO PATH WHERE DATA ARE***)
-setwd("R:/KOALA2018-A0206/model/CA-KoalaOffset")
+rm(list=ls())
+if(!is.null(dev.list())) dev.off()
+
+## Set working directory
+#setwd("XXX")
 
 # load data
 ClearData <- read.dbf("input/clearing/forest_cleared_grid.dbf")

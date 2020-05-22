@@ -26,26 +26,25 @@
 # 72	Industrial
 # 80	water
 
-## Set working directory (***CHANGE TO PATH WHERE DATA ARE***)
-setwd("R:/KOALA2018-A0206/model/CA-KoalaOffset")
-
 ## 0. START ============================================================
 
 rm(list=ls())
 if(!is.null(dev.list())) dev.off()
 
+## Set working directory
+#setwd("XXX")
+
 ## 1. CHECKING AND INSTALLING REQUIRED PACKAGES ========================
 
-if (!require("tidyverse")) devtools::install_github("tidyverse/tidyverse"); library("tidyverse")
-if (!require("raster")) install.packages("raster"); library("raster")
-if (!require("nnet")) install.packages("nnet"); library("nnet")
-if (!require("grDevices")) install.packages("grDevices"); library("grDevices")
-if (!require("diffeR")) install.packages("diffeR"); library("diffeR")
-if (!require("snowfall")) install.packages("snowfall"); library("snowfall")
-if (!require("foreach")) install.packages("foreach"); library("foreach")
-if (!require("doParallel")) install.packages("doParallel"); library("doParallel")
-if (!require("vcd"))   install.packages("vcd"); library("vcd")
-
+library(tidyverse)
+library(raster)
+library(nnet)
+library(grDevices)
+library(diffeR)
+library(snowfall)
+library(foreach)
+library(doParallel)
+library(vcd)
 
 ## 2. FUNCTIONS =====================================================
 
@@ -58,8 +57,9 @@ to_raster <- function(df, rast_template) {
 }
 
 # to create a cross tabulation based on two raster maps with categorical values (does not need to have similar amount of classes)
+# columns are observed, rows are predicted
 to_crosstab <- function (obs, pred, rast_template) {
-  ctable <- (crosstabm(to_raster(obs, rast_template), to_raster(pred, rast_template)))
+  ctable <- crosstabm(to_raster(pred, rast_template), to_raster(obs, rast_template))
   return (ctable)
 }
 
@@ -74,11 +74,11 @@ Mode <- function(x) {
 ## Load maps, data, and lookup tables ####
 lu1999 <- raster("input/maps/landuse99reclsuburb4.asc") # land use in 1999
 lu2016 <- raster("input/maps/landuse16reclsuburb4.asc") # land use 2016
-slope <- raster("input/maps/seq_slope.asc") # slope
-elev <- raster("input/maps/seq_dem.asc") # elevation
+slope <- raster("input/maps/slpfinal1.asc") # slope
+elev <- raster("input/maps/demfinal.asc") # elevation
 road <- raster("input/maps/SEQ_distRoad.asc") # distance to main roads
 city <- raster("input/maps/seq_cityDist.asc") # distance to cities
-roadDen <- raster("input/maps/SEQ_distRoad.asc") # distance to all roads
+roadDen <- raster("input/maps/seq_roadDens.asc") # road density (all roads)
 awc <- raster("input/maps/seq_awcMeans.asc") # soil mean available water content
 awc[is.na(lu1999)] <- NA # remove zeros outside the study area
 cly <- raster("input/maps/seq_clymeans1.asc") # soil clay content
@@ -116,7 +116,7 @@ luLabel <- c(21,22,23,40,51,52,53,60,71,72)
 luLabelList <- list()
 TMods <- list()
 for (i in 1:length(luLabel)){
-  fileName = paste("input/mlrsummary_2020/model", i, ".rda", sep="")
+  fileName = paste("input/mlrsummary/model", i, ".rda", sep="")
   load(fileName)
   TMods[[i]] <- temp_mod
   luLabelList[[i]] <- luLabel[i]
@@ -150,14 +150,14 @@ for (i in 1:MaxIter) {
 }
 
 # save actual and predicted land-uses in 2016
-saveRDS(lu1999.df, "accuracy_assessment/lu1999.rds")
-saveRDS(lu2016.df, "accuracy_assessment/lu2016.rds")
-saveRDS(LandUsePredList,"accuracy_assessment/predictions.rds")
+saveRDS(lu1999.df, "sim_results/accuracy_assessment/lu1999.rds")
+saveRDS(lu2016.df, "sim_results/accuracy_assessment/lu2016.rds")
+saveRDS(LandUsePredList,"sim_results/accuracy_assessment/predictions.rds")
 
-# read in simulations if necessary
-Past <- readRDS("accuracy_assessment/lu1999.rds")
-Current <- readRDS("accuracy_assessment/lu2016.rds")
-Simulated <- readRDS("accuracy_assessment/predictions.rds")
+# read in simulations
+Past <- readRDS("sim_results/accuracy_assessment/lu1999.rds")
+Current <- readRDS("sim_results/accuracy_assessment/lu2016.rds")
+Simulated <- readRDS("sim_results/accuracy_assessment/predictions.rds")
 
 # create raster stack
 for (i in 1:length(Simulated)){
@@ -168,14 +168,14 @@ for (i in 1:length(Simulated)){
   }
 }
 
+# get the model of the simulations
 SimMode <- calc(SimStack, fun = Mode)
 
-# calculate kapa
-ctable.act.sim <- to_crosstab(SimMode$layer, Current$lu2016, lu2016)[c(2,3,4,6,7,8,9,10,11,12),c(2,3,4,6,7,8,9,10,11,12)] # crosstab between actual vs simulated LU map
-source("R_functions/kappa_rossiter.R")
-kappa.Rositer <- kappa(ctable.act.sim)
-summary.kappa(kappa.Rositer, alpha=0.05)
-kappa_Rositer <- cbind(UserNaive = kappa.Rositer$user.naive,
-                           ProdNaive = kappa.Rositer$prod.naive,
-                           UserKappa = kappa.Rositer$user.kappa,
-                           ProdKappa = kappa.Rositer$prod.kappa)
+# create error matrix based on the modal land use of the simulations
+# actual in the columns and simulated in the rows
+Obs <- Current$lu2016
+Pred <- SimMode$layer
+Obs[(Past$lucurr == 10) | (Past$lucurr == 30) | (Past$lucurr == 80)] <- NA
+Pred[(Past$lucurr == 10) | (Past$lucurr == 30) | (Past$lucurr == 80)] <- NA
+ctable.act.sim <- to_crosstab(obs = Obs, pred = Pred, lu2016) # crosstab between actual vs simulated LU map
+write.csv(ctable.act.sim, "sim_results/accuracy_assessment/error_matrix.csv")

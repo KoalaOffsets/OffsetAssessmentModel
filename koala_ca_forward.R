@@ -1,15 +1,3 @@
-## Input: land cover 1999 and 2016; macro factors, MLR coefficients
-## Analysis:
-## Author: Agung Wahyudi & Jonathan Rhodes
-## Date first created: 06/08/2018
-##
-## About the ca model:
-## The initial structure of the ca model
-## was inspired by simlander/apolus.
-## Different to simlander, current ca model
-## takes into account multiple-change pathways
-## Modification: "removal of sample points of less than 2" on cross-tab
-
 ## land use codes used
 
 # 10	Conservation
@@ -26,19 +14,20 @@
 # 72	Industrial
 # 80	water
 
-# Set working directory (***CHANGE TO PATH WHERE DATA ARE***)
-setwd("R:/KOALA2018-A0206/model/CA-KoalaOffset")
 rm(list=ls())
 if(!is.null(dev.list())) dev.off()
 
-# INSTALL PACKAGES
+# Set working directory
+#setwd("XXX")
 
-if (!require("tidyverse")) devtools::install_github("tidyverse/tidyverse"); library("tidyverse")
-if (!require("raster")) install.packages("raster"); library("raster")
-if (!require("nnet")) install.packages("nnet"); library("nnet")
-if (!require("snowfall")) install.packages("snowfall"); library("snowfall")
-if (!require("foreach")) install.packages("foreach"); library("foreach")
-if (!require("doParallel")) install.packages("doParallel"); library("doParallel")
+# LOAD PACKAGES
+
+library(tidyverse)
+library(raster)
+library(nnet)
+library(snowfall)
+library(foreach)
+library(doParallel)
 
 # FUNCTIONS
 
@@ -277,7 +266,7 @@ get_off_sites_anywhere <- function(OffArea.df, OffAreaB.df, Costs, PercAvail, Ta
   }
 }
 
-RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon) {
+RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon) {
 
   # determine where is protected, where impacts can be offset, and where offset sites can be located under the previous or current regulation/policy
   if (Reg == "previous") {
@@ -340,7 +329,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   luLabelList <- list()
   TMods <- list()
   for (i in 1:length(luLabel)){
-    fileName = paste("input/mlrsummary_2020/model", i, ".rda", sep="")
+    fileName = paste("input/mlrsummary/model", i, ".rda", sep="")
     load(fileName)
     TMods[[i]] <- temp_mod
     luLabelList[[i]] <- luLabel[i]
@@ -353,9 +342,31 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   # the matrix represents new dwelling demand for LGAs and consolidation and expansion combinations
   # LGAs and whether existing urban areas or not (LGAExistUrb) 1 = LGA 1 not urban (expansion), 2 = LGA 1 urban (consolidation), ...., 15 = LGA 8 not urban (expansion), 16 = LGA 8 urban (consolidation). LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan] & existing urban areas as defined in Shaping SEQ [1 = existing urban area, 0 = not existing urban area]
   if (Horizon == 2031) {
-    UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(25600,29300,1500,2600,3400,8900,20700,28900,4900,105700,20600,70000,43000,14500,33300,11500)) #2031 demand
+    UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(25600,29300,1500,2600,3400,8900,20700,28900,4900,105700,20600,70000,43000,14500,33300,11500))
+    # adjust for the percent consolidation
+    for (i in 1:16) {
+      if ((i %% 2) == 1) {
+          UrbanDemand[i, "Demand"] <- UrbanDemand[i, "Demand"] + UrbanDemand[i + 1, "Demand"] * (1 - (PercConsol / 100))
+      }
+      else {
+          UrbanDemand[i, "Demand"] <- UrbanDemand[i, "Demand"] * (PercConsol / 100)
+      }
+    }
+
+    #2031 demand
   } else if (Horizon == 2041) {
-    UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(40100,48200,1600,4800,4700,12500,33300,53700,11400,176800,31000,127900,83800,27900,70000,19900)) #2041 demand
+    UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(40100,48200,1600,4800,4700,12500,33300,53700,11400,176800,31000,127900,83800,27900,70000,19900))
+    # adjust for the percent consolidation
+    for (i in 1:16) {
+      if ((i %% 2) == 1) {
+          UrbanDemand[i, "Demand"] <- UrbanDemand[i, "Demand"] + UrbanDemand[i + 1, "Demand"] * (1 - (PercConsol / 100))
+      }
+      else {
+          UrbanDemand[i, "Demand"] <- UrbanDemand[i, "Demand"] * (PercConsol / 100)
+      }
+    }
+
+    #2041 demand
   } else {
     UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf)) #2041 demand
   }
@@ -372,7 +383,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   DwellGrowthReport <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Growth0" = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0))
   # create vector to hold tests of whether dwelling targets have been met or not
   TargetTest <- c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-  #set up data frame to hold where target constraints are to prevent transitions to 51, 52, and 53
+  #set up data frame to hold where target constraints are met to prevent transitions to 51, 52, and 53
   TargetCons <- cbind(LGAExistUrb.df$LGAExistUrb, as.data.frame(matrix(rep(1,dim(LGAExistUrb.df)[[1]] * 13), nrow = dim(LGAExistUrb.df)[[1]], ncol = 13)))
   dimnames(TargetCons)[[2]] <- c("LGAExistUrb", "10", "21", "22", "23", "30", "40", "51", "52", "53", "60", "71", "72", "80")
 
@@ -383,7 +394,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   dimnames(PlanCons)[[2]] <- c("plan2017", "10", "21", "22", "23", "30", "40", "51", "52", "53", "60", "71", "72", "80")
 
   # get transition probability constraints that are assumed not possible based the land use classes in ShapingSEQ
-  # these constraints are that transitions to medium and high density residential development are only permitted in the urban footprint
+  # these constraints are that transitions to medium and high density residential development are not permitted in the rural living area (this class is not represented in the transition model)
   UFfact.df <- as.data.frame(UFfact)
   UFCons <- UFfact.df %>% left_join(UFfacttb, by = "UFfact")
   dimnames(UFCons)[[2]] <- c("UFfact", "10", "21", "22", "23", "30", "40", "51", "52", "53", "60", "71", "72", "80")
@@ -458,8 +469,7 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
   #loop through iterations to run simulation
 
   for (i in 1:MaxIter) {
-
-    # constraints on transition to 51, 52, and 53 where dwelling targets already met
+    # constraints on transition to 51, 52, 53 where dwelling targets already met
     # if some targets met then adjust constraints so we get no further transitions to 51, 52, and 53
     if (length(which(TargetTest == 1)) > 0) {
         for (j in which(TargetTest == 1)) {
@@ -470,9 +480,9 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
     }
     TargetCons[which(is.na(TargetCons$LGAExistUrb)), c("10", "21", "22", "23", "30", "40", "51", "52", "53", "60", "71", "72", "80")] <- NA
 
-    # get transition probability predictions, incorporating fixed planning scheme and ShapingSEQ constraints if regulation assumed
+    # get transition probability predictions incorporating planning scheme constraints if regulation assumed
     if (Reg == "none") {
-      Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables] * TargetCons[which(lucurr.df$lucurr == x), Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
+      Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables] * UFCons[which(lucurr.df$lucurr == x), Variables] * TargetCons[which(lucurr.df$lucurr == x), Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
     } else {
       Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables] * PlanCons[which(lucurr.df$lucurr == x), Variables] * UFCons[which(lucurr.df$lucurr == x), Variables] * TargetCons[which(lucurr.df$lucurr == x), Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
     }
@@ -785,17 +795,17 @@ RunOffSim <- function(MaxInter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Pe
 
 # FIRST GET DATA
 
-## Load maps, data, and lookup tables ####
+## Load maps, data, and lookup tables
 lu1999 <- raster("input/maps/landuse99reclsuburb4.asc") # land use in 1999
 lu2016 <- raster("input/maps/landuse16reclsuburb4.asc") # land use 2016
 plan2010 <- raster("input/maps/seq_planning_scheme_2010.asc") # see: 04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description - planning schemes for 2010
 plan2017 <- raster("input/maps/seq_planning_scheme_2017b.asc") # see: 04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description - planning schemes for 2017
 plan2017tb <- read.csv("input/table/planningScheme2017.csv", header = TRUE) # planning scheme constraints table for 2017
-slope <- raster("input/maps/seq_slope.asc") # slope
-elev <- raster("input/maps/seq_dem.asc") # elevation
+slope <- raster("input/maps/slpfinal1.asc") # slope
+elev <- raster("input/maps/demfinal.asc") # elevation
 road <- raster("input/maps/SEQ_distRoad.asc") # distance to main roads
 city <- raster("input/maps/seq_cityDist.asc") # distance to cities
-roadDen <- raster("input/maps/SEQ_distRoad.asc") # distance to all roads
+roadDen <- raster("input/maps/seq_roadDens.asc") # road density (all roads)
 awc <- raster("input/maps/seq_awcMeans.asc") # soil mean available water content
 awc[is.na(lu1999)] <- NA # remove zeros outside the study area
 cly <- raster("input/maps/seq_clymeans1.asc") # soil clay content
@@ -877,182 +887,667 @@ names(Kra) <- "Kra"
 names(KraInv) <- "KraInv"
 names(LandVal) <- "LandVal"
 
-# SCENARIO TEST
-MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
-Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
-OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
-Multiplier <- 3 # the multiplier applied
-RestSucc <- 0.9 # probability that restoration succeeds
-PercAvail <- 100 # percent of potential offset sites available
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
-
-
 ## SET UP AND RUN SCENARIOS
 
 # scenarios
-# 1. No regulation (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
-# 2. Current regulation - no offsets (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
-# 3. Current regulation - offsets in LGAs (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
-# 4. Current regulation - offsets anywhere (1%, 10%, 20%, 100% availability of offset sites + 2031 and 2041 horizons)
+# 1. No regulation (2041 horizon + 100% and 50% consolidation) - 2 sets
+# 2. Current regulation - no offsets (2041 horizon + 100% and 50% consolidation) - 2 sets
+# 3. Current regulation - offsets in LGAs (1%, 10%, 20%, 100% availability of offset sites + 2041 horizon + 100% and 50% consolidation) - 8 sets
+# 4. Current regulation - offsets anywhere (1%, 10%, 20%, 100% availability of offset sites + 2041 horizon + 100% and 50% consolidation) - 8 sets
+# 5. Previous regulation - no offsets (2041 horizon + 100% and 50% consolidation) - 2 sets
+# 6. Previous regulation - offsets in LGAs (1%, 10%, 20%, 100% availability of offset sites + 2041 horizon + 100% and 50% consolidation) - 8 sets
+# 7. Previous regulation - offsets anywhere (1%, 10%, 20%, 100% availability of offset sites + 2041 horizon + 100% and 50% consolidation) - 8 sets
 
 # set up parallel processing
 cl <- makeCluster(4)  # initiate parallel computing
 registerDoParallel(cl)  # use multicore, set to the number of our cores
 
-# HORIZON 2031
+clusterExport(cl, c('lu1999', 'lu2016', 'plan2010', 'plan2017', 'plan2017tb', 'slope', 'elev', 'road', 'city', 'roadDen', 'awc', 'cly', 'NeighUrb', 'NeighInd', 'UFfact', 'UFfacttb', 'lgasfact', 'DwelDentb', 'LGAExistUrb', 'HabHM', 'HabML', 'HabVL', 'HabCore', 'HabNonCore', 'HabHMPre', 'HabMLPre', 'HabVLPre', 'HabCorePre', 'HabNonCorePre', 'KNum', 'KadaBOU', 'PKadaB', 'KadaBHMR', 'KadaHMR', 'KadaLR', 'HabKpa', 'HabNotKpa', 'RestKpa', 'RestNotKpa', 'PdaInv', 'KraInv', 'LandVal'))
 
-# SCENARIO 1 - no regulation and no offsets
+# SCENARIO 1 (1) - no regulation + no offsets + 100% consolidation
 MaxIter <- 1000
-RepSteps <- 2 # how often (how many iterations) to report and record outputs
+RepSteps <- 1 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
 Reg <- "none" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
 OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- NA # the multiplier applied
+RestSucc <- NA # probability that restoration succeeds
+PercAvail <- NA # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 1 (2) - no regulation + no offsets + 50% consolidation
+MaxIter <- 1000
+RepSteps <- 1 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "none" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- NA # the multiplier applied
+RestSucc <- NA # probability that restoration succeeds
+PercAvail <- NA # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 2 (1) - current regulation + no offsets + 100% consolidation
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- NA # the multiplier applied
+RestSucc <- NA # probability that restoration succeeds
+PercAvail <- NA # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 2 (2) - current regulation + no offsets + 50% consolidation
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- NA # the multiplier applied
+RestSucc <- NA # probability that restoration succeeds
+PercAvail <- NA # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 3 (1) - current regulation + lga offsets + 100% consolidation + 1% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 3 (2) - current regulation + lga offsets + 100% consolidation + 10% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 3 (3) - current regulation + lga offsets + 100% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 3 (4) - current regulation + lga offsets + 100% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
 Multiplier <- 3 # the multiplier applied
 RestSucc <- 0.9 # probability that restoration succeeds
 PercAvail <- 100 # percent of potential offset sites available
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
   rm(Test)
   gc()
-  NA
 }
 
-# SCENARIO
-
-
-
-
-
-
-
-
-foreach (i = 1:4, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
-  rm(Test)
-  gc()
-  NA
-}
-
-# SCENARIO 1 - no regulation and no offsets
+# SCENARIO 3 (5) - current regulation + lga offsets + 50% consolidation + 1% offset availability
 MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
-Reg <- "none" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
-OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
-Multiplier <- 3 # the multiplier applied
-RestSucc <- 0.9 # probability that restoration succeeds
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
-  rm(Test)
-  gc()
-  NA
-}
-
-# SCENARIO 2 - previous regulation and no offsets
-MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
-Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
-OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
-Multiplier <- 3 # the multiplier applied
-RestSucc <- 0.9 # probability that restoration succeeds
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
-  rm(Test)
-  gc()
-  NA
-}
-
-# SCENARIO 3 - previous regulation and lga offsets
-MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
-Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
-OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
-Multiplier <- 3 # the multiplier applied
-RestSucc <- 0.9 # probability that restoration succeeds
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
-  rm(Test)
-  gc()
-  NA
-}
-
-# SCENARIO 4 - previous regulation and anywhere offsets
-MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
-Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
-OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
-Multiplier <- 3 # the multiplier applied
-RestSucc <- 0.9 # probability that restoration succeeds
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
-  rm(Test)
-  gc()
-  NA
-}
-
-# SCENARIO 5 - current regulation and no offsets
-MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
-Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
-OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
-Multiplier <- 3 # the multiplier applied
-RestSucc <- 0.9 # probability that restoration succeeds
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
-  rm(Test)
-  gc()
-  NA
-}
-
-# SCENARIO 6 - current regulation and lga offsets
-MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
 Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
 OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
 Multiplier <- 3 # the multiplier applied
 RestSucc <- 0.9 # probability that restoration succeeds
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
   rm(Test)
   gc()
-  NA
 }
 
-# SCENARIO 7 - current regulation and anywhere offsets
+# SCENARIO 3 (6) - current regulation + lga offsets + 50% consolidation + 10% offset availability
 MaxIter <- 1000
-RepSteps <- 1 # how often (how many iterations) to report and record outputs
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 3 (7) - current regulation + lga offsets + 50% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 3 (8) - current regulation + lga offsets + 50% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 4 (1) - current regulation + anywhere offsets + 100% consolidation + 1% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
 Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
 OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
 Multiplier <- 3 # the multiplier applied
 RestSucc <- 0.9 # probability that restoration succeeds
-Horizon <- 2031 # time horizon relative Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-
-foreach (i = 1:20, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
-  Test <- RunOffSim(MaxIter, RepSteps, Reg, OffRule, Multiplier, RestSucc, Horizon)
-  saveRDS(Test, paste("E:/analysis/offset_sim_results/", "REP", i, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_hor_", Horizon, "_maxit_", MaxIter, "_repsteps_", RepSteps, ".rds", sep = ""))
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
   rm(Test)
   gc()
-  NA
+}
+
+# SCENARIO 4 (2) - current regulation + anywhere offsets + 100% consolidation + 10% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 4 (3) - anywhere regulation + lga offsets + 100% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 4 (4) - anywhere regulation + lga offsets + 100% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 4 (5) - anywhere regulation + lga offsets + 50% consolidation + 1% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 4 (6) - current regulation + anywhere offsets + 50% consolidation + 10% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 4 (7) - anywhere regulation + anywhere offsets + 50% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 4 (8) - anywhere regulation + anywhere offsets + 50% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 5 (1) - previous regulation + no offsets + 100% consolidation
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- NA # the multiplier applied
+RestSucc <- NA # probability that restoration succeeds
+PercAvail <- NA # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 5 (2) - previous regulation + no offsets + 50% consolidation
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "none" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- NA # the multiplier applied
+RestSucc <- NA # probability that restoration succeeds
+PercAvail <- NA # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (1) - previous regulation + lga offsets + 100% consolidation + 1% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (2) - previous regulation + lga offsets + 100% consolidation + 10% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (3) - previous regulation + lga offsets + 100% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (4) - previous regulation + lga offsets + 100% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (5) - previous regulation + lga offsets + 50% consolidation + 1% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (6) - previous regulation + lga offsets + 50% consolidation + 10% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (7) - previous regulation + lga offsets + 50% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 6 (8) - previous regulation + lga offsets + 50% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (1) - previous regulation + anywhere offsets + 100% consolidation + 1% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (2) - previous regulation + anywhere offsets + 100% consolidation + 10% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (3) - previous regulation + lga offsets + 100% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (4) - previous regulation + lga offsets + 100% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 100 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (5) - previous regulation + lga offsets + 50% consolidation + 1% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 1 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (6) - previous regulation + anywhere offsets + 50% consolidation + 10% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 10 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (7) - previous regulation + anywhere offsets + 50% consolidation + 20% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 20 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
+}
+
+# SCENARIO 7 (8) - previous regulation + anywhere offsets + 50% consolidation + 100% offset availability
+MaxIter <- 1000
+RepSteps <- 2 # how often (how many iterations) to report and record outputs
+Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
+PercConsol <- 50 # percent of the consolidation achieveable
+Reg <- "previous" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
+OffRule <- "anywhere" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
+Multiplier <- 3 # the multiplier applied
+RestSucc <- 0.9 # probability that restoration succeeds
+PercAvail <- 100 # percent of potential offset sites available
+foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
+  Test <- RunOffSim(MaxIter, RepSteps, PercConsol, Reg, OffRule, Multiplier, RestSucc, PercAvail, Horizon)
+  saveRDS(Test, paste("sim_results/", "REP", i, "_repsteps_", RepSteps, "_hor_", Horizon, "_pc_", PercConsol, "_reg_", Reg, "_off_", OffRule, "_mult_", Multiplier, "_rsuc_", RestSucc, "_pa_", PercAvail,  ".rds", sep = ""))
+  rm(Test)
+  gc()
 }
 
 # close cores

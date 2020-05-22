@@ -1,4 +1,4 @@
-## Input: ./input/mlr_2020/mlr_data
+## Input: /input/mlr/mlr_data
 ## Analysis: Multinomial logistic regression
 ## Author: Agung Wahyudi (modified by Jonathan Rhodes)
 ## Date first created: 08/08/2018
@@ -40,8 +40,7 @@ if (!require("foreign"))  install.packages("foreign") ; library("foreign")
 if (!require("raster"))   install.packages("raster")  ; library("raster")
 
 ## 2. SPECIFY WORKING FOLDER  ===================
-setwd("R:/KOALA2018-A0206/model/CA-KoalaOffset")
-# setwd("M:/Projects/koala_offsets/02 Map/Quant_analysis")
+#setwd("XXX")
 
 ##__2.1 -- Load sampling points. OBSELETE. 20/11/2018 MATLAB ####
 
@@ -57,13 +56,12 @@ Models <- vector(mode = "list")
 for (i in 1:length(luLabel)){
   print(paste("Fitting coefficients and estimating transition probabilities for land use", luLabel[i]))
 
-  fileName = paste("./input/mlr_2020/mlr_data", luLabel[i], ".rda", sep="")
+  fileName = paste("input/mlr/mlr_data", luLabel[i], ".rda", sep="")
   load(fileName)
   macroVar <- mlr_Dummy.df
   remove(mlr_Dummy.df)
 
   macroVar$LCfact <- factor(macroVar$lu2016)
-  macroVar$sa4fact <- factor(macroVar$sa4)
   macroVar$UFfact <- factor(macroVar$UF)
   macroVar$lgasfact <- factor(macroVar$lgas)
   macroVar$plan2010fact <- factor(macroVar$plan2010)
@@ -89,9 +87,9 @@ for (i in 1:length(luLabel)){
                    na.action = na.exclude,
                    maxit = 1000)
 
-  fileNametest <- paste('./input/mlrsummary_2020/model',i,'.rda', sep = "")
-  fileNametestcoef <- paste('./input/mlrsummary_2020/coefficient',i,'.txt', sep = "")
-  fileNametestlevel <- paste('./input/mlrsummary_2020/coefficientlevel',i,'.txt', sep = "")
+  fileNametest <- paste("input/mlrsummary/model",i,".rda", sep = "")
+  fileNametestcoef <- paste("input/mlrsummary/coefficient",i,".txt", sep = "")
+  fileNametestlevel <- paste("input/mlrsummary/coefficientlevel",i,".txt", sep = "")
 
   save(temp_mod, file = fileNametest)
   capture.output(coef(temp_mod), append = FALSE, file = fileNametestcoef)
