@@ -31,9 +31,7 @@ for (i in levels(ClearData$LU99fact)) {
   Model <- glm(cbind(CLEAR, NOCLEAR) ~ LU16fact, data = NewData, family = "binomial")
   Preds <- predict.glm(object = Model, newdata = Model$xlevels, type = "response")
   names(Preds) <- Model$xlevels$LU16fact
-
   ClearPred[which(levels(ClearData$LU99fact) == i), intersect(names(ClearPred), names(Preds))] <- Preds
-
   Models[[i]] <- Model
 }
 

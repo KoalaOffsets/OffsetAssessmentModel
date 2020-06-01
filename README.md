@@ -1,13 +1,13 @@
-# LandUseModel
+# South East Queensland Koala Offsets Assessment Model
 
-This contains the code for the land use change model that does the following:
+## Models
 
-- estimates transition rates between different land uses
-- simulates the changes in land use across SEQ for different scenarios
-- incorporates offset rules for different offset policy scenarios  
+This contains the code for a spatial simulation model to assess offset policies for koalas in South East Queensland, and includes:
 
-# Data
+- A land change model, accuracy assessment, and forward simulations (koala_ca_select_fit_dat.r, koala_ca_model_fitting.r, koala_ca_accuracy_assesment.r, koala_ca_forward.r)
+- A koala habitat clearing model (clearing_model.r)
+- Regulation and policy setting rules (in koala_ca_forward.r)  
 
-Put the data in /data accessible here: (to complete)
+## Data
 
-This is not uploaded (AND SHOULD NOT BE UPLOADED!) to GitHub - some of the data sets used are on restricted licences.
+- Data inputs currently available from j.rhodes@uq.edu.au by request

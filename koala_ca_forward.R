@@ -62,6 +62,7 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, KNum
     if (PriorKDen == TRUE) {
       # get cost effectiveness - koalas purchased per $1000
       CostE <- (KNum * 1000) / Costs
+      CostEB <- (KNum * 1000) / Costs
     } else {
       # get cost effectiveness - hectares purchased per $1000
       CostE <- 1000 / Costs
@@ -172,6 +173,7 @@ get_off_sites_anywhere <- function(OffArea.df, OffAreaB.df, Costs, KNum, PercAva
     if (PriorKDen == TRUE) {
       # get cost effectiveness - koalas purchased per $1000
       CostE <- (KNum * 1000) / Costs
+      CostEB <- (KNum * 1000) / Costs
     } else {
       # get cost effectiveness - hectares purchased per $1000
       CostE <- 1000 / Costs
@@ -623,7 +625,7 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
           RestoreOpp.df[-OffSel,"RestoreOpp"] <- NA
           RestoreOppB.df[-OffSelB, "RestorOppB"] <- NA
 
-          # get allocation anywhere based on thwe sites available everywhere
+          # get allocation anywhere based on the sites available everywhere
           Allocation2 <- get_off_sites_anywhere(OffArea.df = RestoreOpp.df$RestoreOpp, OffAreaB.df = RestoreOppB.df$RestoreOppB, Costs = LandVal.df$LandVal, KNum = KNum.df$KNum, PercAvail = 100, Target =  sum(RemainingLGA[which(ExitF == -1)]), PriorKDen = PriorKDen)
 
           # increment offset costs
@@ -1023,7 +1025,7 @@ foreach (i = 1:10, .packages = c("tidyverse", "raster", "nnet")) %dopar% {
 MaxIter <- 1000
 RepSteps <- 2 # how often (how many iterations) to report and record outputs
 Horizon <- 2041 # time horizon relative to Shaping SEQ - determines the dwelling demand - 2031, 2041, or Inf
-PercConsol <- 100 # percent of the consolidation achieveable
+PercConsol <- 100 # percent of the consolidation achievable
 Reg <- "current" # "none", or "previous", or "current" regulation ("none" means no regulation including planning schemes and offsets")
 OffRule <- "lga" # "none", within "lga" or "anywhere" spatial rule ("none" means no offsets)
 Multiplier <- 3 # the multiplier applied
@@ -1578,7 +1580,7 @@ stopImplicitCluster()
 # 7. Previous regulation - offsets anywhere (1%, 10%, 20%, 100% availability of offset sites + 2041 horizon + 100% and 50% consolidation) - 8 sets
 
 # set up parallel processing
-cl <- makeCluster(8)  # initiate parallel computing
+cl <- makeCluster(4)  # initiate parallel computing
 registerDoParallel(cl)  # use multicore, set to the number of our cores
 
 clusterExport(cl, c('lu1999', 'lu2016', 'plan2010', 'plan2017', 'plan2017tb', 'slope', 'elev', 'road', 'city', 'roadDen', 'awc', 'cly', 'NeighUrb', 'NeighInd', 'UFfact', 'UFfacttb', 'lgasfact', 'DwelDentb', 'LGAExistUrb', 'HabHM', 'HabML', 'HabVL', 'HabCore', 'HabNonCore', 'HabHMPre', 'HabMLPre', 'HabVLPre', 'HabCorePre', 'HabNonCorePre', 'KNum', 'KadaBOU', 'PKadaB', 'KadaBHMR', 'KadaHMR', 'KadaLR', 'HabKpa', 'HabNotKpa', 'RestKpa', 'RestNotKpa', 'PdaInv', 'KraInv', 'LandVal'))
