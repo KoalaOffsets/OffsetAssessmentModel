@@ -1,7 +1,7 @@
 ## land use codes used
 
 # 10	Conservation
-# 21	Grazing native vegetation
+# 21	Grazing
 # 22	Cropping and modified pasture
 # 23	Other agricultural
 # 30	Forestry
@@ -9,16 +9,13 @@
 # 51	Low-density urban residential
 # 52	Medium-density urban residential
 # 53	High-density urban residential
-# 60	Intensive urban area
+# 60	Services, utilities, mining
 # 71	Intensive agriculture
 # 72	Industrial
 # 80	water
 
 rm(list=ls())
 if(!is.null(dev.list())) dev.off()
-
-# Set working directory
-#setwd("XXX")
 
 # LOAD PACKAGES
 
@@ -108,7 +105,7 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, KNum
       Left <- Target - sum(Areas, na.rm = T)
       ExitFlag <- 1
     }
-    # not enough area for restoration so use the backup
+    # not enough area for restoration so use backup area
     else {
       # get all allocations in the offset sites area
       if (length(SortAreasSumLGA) > 0) {
@@ -122,7 +119,7 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, KNum
         DiffTarg <- (SortAreasBSumLGA - (Target - (if (length(SortAreasSumLGA) > 0) {max(SortAreasSumLGA, na.rm = TRUE)} else {0}))) ^ 2
         MinIndex <- which.min(DiffTarg)
 
-        # allocate needed in backup sites
+        # allocate needed area in backup area
         Needed2 <- OrderBLGA[1:MinIndex]
         Areas <- c(OffArea.df[Needed1], OffAreaB.df[Needed2])
         Left <- Target - sum(Areas, na.rm = T)
@@ -144,7 +141,7 @@ get_off_sites_lga <- function(Lga, Lgas.df, OffArea.df, OffAreaB.df, Costs, KNum
         ExitFlag <- -1
       }
 
-      #allocate needed
+      # allocate needed
       Needed <- c(Needed1, Needed2)
     }
 
@@ -278,46 +275,35 @@ get_off_sites_anywhere <- function(OffArea.df, OffAreaB.df, Costs, KNum, PercAva
   }
 }
 
-RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, PriorKDen = FALSE, RestSucc, PercAvail, Horizon) {
+RunOffSim <- function(MaxIter, RepSteps, PercConsol, Reg = FALSE, OffRule = "none", Multiplier, PriorKDen = FALSE, RestSucc, PercAvail, Horizon) {
+# this function runs the forward offset simulation model
+# note that this function accesses globally defined variables
+# Reg = whether regulation considered or not - TRUE or FALSE
+# OffRule = offset rule used - "none" = no offsets, "lga" = offset sites allocated to LGA of impact,
 
-  # determine where is protected, where impacts can be offset, and where offset sites can be located under the previous or current regulation/policy
-  if (Reg == "previous") {
-    Prot <- max(stack(PKadaB, KadaBOU)) * PdaInv * KraInv # previous protected areas
+  # determine where is protected, where impacts may be offset, and where offset sites can be located under the regulation/policy or no regulation
+  # apply regulation of regulation implemented
+  if (Reg == TRUE) {
+
+    # areas that may be protected
+    Prot <- HabKpa * (1 - Sda) * (1 - Pda) * (1 - Kbha) * (1 - Kra) # areas where koala habitat in a KPA is always protected
     names(Prot) <- "Prot"
-    ProtInv <- reclassify(Prot, matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2))
-    names(ProtInv) <- "ProtInv"
-    ImpOff <- KadaBHMR * ProtInv * PdaInv * KraInv # areas where impacts to be offset
+    ProtKRA <- HabKpa * (1 - Sda) * (1 - Pda) * (1 - Kbha) * Kra # areas in Key Resource Areas where koala habitat in a KPA is protected if it is not a transition to Commercial land-use
+                                                                    # if land-use transition is to Commercial then impacts must be offset
+    names(ProtKRA) <- "ProtKRA"
+
+    # areas where impacts may require offsets
+    ImpOff <- (1 - Sda) * (1 - Pda) * ((HabKpa * Kbha) + (HabNotKpa * ((1 - Kbha) + (Kbha * (1 - Kra))))) # areas where impacts are always offset
     names(ImpOff) <- "ImpOff"
-    OffSite <- KadaHMR # areas for offset sites
-    names(OffSite) <- "OffSite"
-    OffSiteB <- KadaLR # backup areas for offset sites
-    names(OffSiteB) <- "OffSiteB"
-  } else if (Reg == "current") {
-    Prot <- HabKpa * PdaInv * KraInv # current protected areas
-    names(Prot) <- "Prot"
-    ProtInv <- reclassify(Prot, matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2))
-    names(ProtInv) <- "ProtInv"
-    ImpOff <- HabNotKpa * ProtInv * KraInv # areas where impacts to be offset
-    names(ImpOff) <- "ImpOff"
+    ImpOffKRA <- HabNotKpa * (1 - Sda) * (1 - Pda) * Kbha * Kra # areas in Key Resource Areas where impacts only need to be offset if land-use transition is
+                                                                    # not to Commercial
+    names(ImpOffKRA1) <- "ImpOffKRA"
+
+    # area offset sites
     OffSite <- RestKpa # areas for offset sites
     names(OffSite) <- "OffSite"
     OffSiteB <- RestNotKpa # backup areas for offset sites
     names(OffSiteB) <- "OffSiteB"
-  } else {
-    Prot <- HabKpa * PdaInv * KraInv # current protected areas
-    names(Prot) <- "Prot"
-    Prot[Prot == 1] <- 0
-    ProtInv <- reclassify(Prot, matrix(c(0, 1, 1, 0), nrow = 2, ncol = 2))
-    names(ProtInv) <- "ProtInv"
-    ImpOff <- HabNotKpa * ProtInv * PdaInv * KraInv # areas where impacts to be offset
-    names(ImpOff) <- "ImpOff"
-    ImpOff[ImpOff == 1] <- 0
-    OffSite <- RestKpa # areas for offset sites
-    names(OffSite) <- "OffSite"
-    OffSite[OffSite == 1] <- 0
-    OffSiteB <- RestNotKpa # backup areas for offset sites
-    names(OffSiteB) <- "OffSiteB"
-    OffSiteB[OffSiteB == 1] <- 0
   }
 
   # set up record of offsets
@@ -328,7 +314,7 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
   OffsetSites[OffsetSites > 0] <- 0
   names(OffsetSites) <- "OffsetSites"
 
-  # compile predictors into a data frame
+  # compile land-use change predictors into a data frame
   Predictors <- as.data.frame(stack(c(slope, elev, road, city, roadDen, awc, cly, NeighUrb, NeighInd, UFfact, lgasfact)))
   # scale data the same way that they are scaled in the fitting process
   Predictors <- Predictors %>% mutate_at(c("slope", "elev", "road", "city", "roadDen", "awc", "cly", "NeighUrb", "NeighInd"), ~(scale(.)))
@@ -336,7 +322,7 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
   Predictors$UFfact <- as.factor(Predictors$UFfact)
   Predictors$lgasfact <- as.factor(Predictors$lgasfact)
 
-  # get transition probability models
+  # get land-use transition probability models
   luLabel <- c(21,22,23,40,51,52,53,60,71,72)
   luLabelList <- list()
   TMods <- list()
@@ -354,6 +340,7 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
   # the matrix represents new dwelling demand for LGAs and consolidation and expansion combinations
   # LGAs and whether existing urban areas or not (LGAExistUrb) 1 = LGA 1 not urban (expansion), 2 = LGA 1 urban (consolidation), ...., 15 = LGA 8 not urban (expansion), 16 = LGA 8 urban (consolidation). LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan] & existing urban areas as defined in Shaping SEQ [1 = existing urban area, 0 = not existing urban area]
   if (Horizon == 2031) {
+    # 2031 demand
     UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(25600,29300,1500,2600,3400,8900,20700,28900,4900,105700,20600,70000,43000,14500,33300,11500))
     # adjust for the percent consolidation
     for (i in 1:16) {
@@ -364,9 +351,8 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
           UrbanDemand[i, "Demand"] <- UrbanDemand[i, "Demand"] * (PercConsol / 100)
       }
     }
-
-    #2031 demand
   } else if (Horizon == 2041) {
+    # 2041 demand
     UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(40100,48200,1600,4800,4700,12500,33300,53700,11400,176800,31000,127900,83800,27900,70000,19900))
     # adjust for the percent consolidation
     for (i in 1:16) {
@@ -377,10 +363,8 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
           UrbanDemand[i, "Demand"] <- UrbanDemand[i, "Demand"] * (PercConsol / 100)
       }
     }
-
-    #2041 demand
   } else {
-    UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf)) #2041 demand
+    UrbanDemand <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Demand" = c(Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf,Inf))
   }
 
   # create raster to hold new spatial dwelling growth
@@ -388,14 +372,14 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
   DwellGrowth[DwellGrowth > 0] <- 0
   names(DwellGrowth) <- "DGrowth"
 
-  # create data frame version of LGA and existing urban layer
+  # create data frame version of LGAs and existing urban areas layers
   LGAExistUrb.df <- as.data.frame(LGAExistUrb)
   names(LGAExistUrb.df) <- "LGAExistUrb"
   # create data to hold simulated dwelling growth for each LGA urban/non-urban combination
   DwellGrowthReport <- data.frame("LGAExistUrb" = c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16), "Growth0" = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0))
   # create vector to hold tests of whether dwelling targets have been met or not
   TargetTest <- c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-  #set up data frame to hold where target constraints are met to prevent transitions to 51, 52, and 53
+  # set up data frame to hold where target constraints are met to prevent transitions to 51, 52, and 53
   TargetCons <- cbind(LGAExistUrb.df$LGAExistUrb, as.data.frame(matrix(rep(1,dim(LGAExistUrb.df)[[1]] * 13), nrow = dim(LGAExistUrb.df)[[1]], ncol = 13)))
   dimnames(TargetCons)[[2]] <- c("LGAExistUrb", "10", "21", "22", "23", "30", "40", "51", "52", "53", "60", "71", "72", "80")
 
@@ -412,7 +396,7 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
   dimnames(UFCons)[[2]] <- c("UFfact", "10", "21", "22", "23", "30", "40", "51", "52", "53", "60", "71", "72", "80")
 
   # set up current land use
-  lucurr <- lu2016 ##set current land use
+  lucurr <- lu2016 # set current land use
   lu2016.df <- as.data.frame(lu2016) # land use in data from format
   lucurr.df <- lu2016.df #set current land use as a data frame
   names(lucurr) <- "lucurr"
@@ -434,7 +418,9 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
 
   # set up regulation, offset, and land value dataframes
   Prot.df <- as.data.frame(Prot)
+  ProtKRA.df <- as.data.frame(ProtKRA)
   ImpOff.df <- as.data.frame(ImpOff)
+  ImpOffKRA.df <- as.data.frame(ImpOffKRA)
   OffSite.df <- as.data.frame(OffSite)
   OffSiteB.df <- as.data.frame(OffSiteB)
   OffsetImpactSites.df <- as.data.frame(OffsetImpactSites)
@@ -479,11 +465,11 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
   RemainingLGA <- c(0,0,0,0,0,0,0,0) # the area of offsets remaining unallocated in each LGA
   Remaining <- 0 # the area of offsets remaining unallocated in total
 
-  #loop through iterations to run simulation
+  # loop through iterations to run simulation
 
   for (i in 1:MaxIter) {
     # constraints on transition to 51, 52, 53 where dwelling targets already met
-    # if some targets met then adjust constraints so we get no further transitions to 51, 52, and 53
+    # if some dwelling targets met, then adjust constraints so we get no further transitions to 51, 52, and 53
     if (length(which(TargetTest == 1)) > 0) {
         for (j in which(TargetTest == 1)) {
           TargetCons[which((TargetCons[,"LGAExistUrb"] == j) & (lucurr.df[,"lucurr"] != 51)), "51"] <- 0
@@ -494,10 +480,10 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
     TargetCons[which(is.na(TargetCons$LGAExistUrb)), c("10", "21", "22", "23", "30", "40", "51", "52", "53", "60", "71", "72", "80")] <- NA
 
     # get transition probability predictions incorporating planning scheme constraints if regulation assumed
-    if (Reg == "none") {
-      Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables] * UFCons[which(lucurr.df$lucurr == x), Variables] * TargetCons[which(lucurr.df$lucurr == x), Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
-    } else {
+    if (Reg == TRUE) {
       Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables] * PlanCons[which(lucurr.df$lucurr == x), Variables] * UFCons[which(lucurr.df$lucurr == x), Variables] * TargetCons[which(lucurr.df$lucurr == x), Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
+    } else {
+      Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables] * UFCons[which(lucurr.df$lucurr == x), Variables] * TargetCons[which(lucurr.df$lucurr == x), Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
     }
 
     # set transitions that are not possible to zero
@@ -508,7 +494,7 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
     # 4. High density urban (53) cannot transition to Medium density urban (52), low density urban (51), rural residential (40), grazing (21), crops (22), or transition (23)
     # 5. Commercial (60) cannot transition to rural residential (40), grazing (21), crops (22), or transition (23)
     # 6. Intensive agriculture (71) cannot transition to grazing (21), crops (22), or transition (23)
-    # 6. Industrial (72) cannot transition to rural residential (40), grazing (21), crops (22), or transition (23)
+    # 7. Industrial (72) cannot transition to rural residential (40), grazing (21), crops (22), or transition (23)
     Predictions[[4]] <- set_trans_zero(Predictions[[4]], c("21","22","23"))
     Predictions[[5]] <- set_trans_zero(Predictions[[5]], c("40","21","22","23"))
     Predictions[[6]] <- set_trans_zero(Predictions[[6]], c("51","40","21","22","23"))
@@ -536,9 +522,10 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
 
     # prevent koala tree loss and land use change associated with koala habitat loss where koala habitat is protected if regulation assumed
     # adjust habitat and land use change
-    if (Reg != "none") {
-      HabLoss.df[which((HabLoss.df > 0) & (Prot.df == 1)), "HabLoss"] <- 0
-      LUChange.df[which((HabLoss.df > 0) & (Prot.df == 1)), "lunew"] <- LUChange.df[which((HabLoss.df > 0) & (Prot.df == 1)), "lucurr"]
+    if (Reg == TRUE) {
+      HabLoss.df[which(((HabLoss.df > 0) & (Prot.df == 1)) | ((HabLoss.df > 0) & (ProtKRA.df == 1) & (LUChange.df[,"lunew"] != "60"))), "HabLoss"] <- 0
+      LUChange.df[which(((HabLoss.df > 0) & (Prot.df == 1)) | ((HabLoss.df > 0) & (ProtKRA.df == 1) & (LUChange.df[,"lunew"] != "60"))), "lunew"] <-
+                LUChange.df[which(((HabLoss.df > 0) & (Prot.df == 1)) | ((HabLoss.df > 0) & (ProtKRA.df == 1) & (LUChange.df[,"lunew"] != "60"))), "lucurr"]
       NewLU.df$lucurr <- LUChange.df$lunew
     }
 
@@ -558,12 +545,13 @@ RunOffSim <- function(MaxInter, RepSteps, PercConsol, Reg, OffRule, Multiplier, 
     HabNonCore.df <- HabNonCore.df * (1 - HabLoss.df)
     names(HabNonCore.df) <- "HabNonCore"
 
-    if (OffRule != "none") {
-    # offsets
-      # identify where offsets are required and allocate offset sites for restoration
-      # get offset impacts
+    if (OffRule != "none" & Reg == TRUE) {
+    # offsets policy implemented - if regulation not considered then no offsets assumed possible, i.e., offsets cannot occur in isolation of the planning regulation
+    # identify where offsets are required and allocate offset sites for restoration
+    # get offset impacts
       KoalaTreeLostOff.df <- KoalaTreeLost.df
-      KoalaTreeLostOff.df$KoalaTreeLost[which(ImpOff.df$ImpOff == 0)] <- 0
+      # Set tree loss KoalaTreeLostOff in areas not requiring offsets to zero
+      KoalaTreeLostOff.df$KoalaTreeLost[!which((ImpOff.df == 1) & ((ProtKRA.df == 1) & (LUChange.df[,"lunew"] == "60")) & ((ImpOffKRA.df == 1) & (LUChange.df[,"lunew"] != "60")))] <- 0
       # get the opportunities and back-up opportunities for the amount of koala habitat that could be restored in places that are in the permitted restoration areas and are of land uses 10, 21, 22, 23, 30
       RestoreOpp.df <- (HabCorePre.df + HabNonCorePre.df) - (HabCore.df + HabNonCore.df)
       names(RestoreOpp.df) <- "RestoreOpp"
@@ -850,11 +838,11 @@ HabNotKpa <- raster("input/maps/habnkpaf.asc") # habitat outside of koala priori
 RestKpa <- raster("input/maps/restkpaf.asc") # restoration areas in koala priority areas
 RestNotKpa <- raster("input/maps/restnkpaf.asc") # restoration areas outside koala priority areas
 Pda <- raster("input/maps/pda_fin.asc") # koala habitat not protected nor offsets required - Priority Development Area
-PdaInv <- reclassify(Pda, matrix(c(0,1,1,0),nrow=2,ncol=2))
 Kra <- raster("input/maps/krafin.asc") # koala habitat not protected nor offsets required - Key Resource Area
-KraInv <- reclassify(Kra, matrix(c(0,1,1,0),nrow=2,ncol=2))
+Kbha <- raster("input/maps/kbhafin.asc") # koala habitat not protected, but offsets required - Koala Broad Hectare Areas
+Sda <- raster("input/maps/sdafin.asc") # State Development Areas
 LandVal <- raster("input/maps/lvalsimf.asc") # unimproved land value from 2012 (QVAS data). Here have estimated missing or zero values using an inverse distance weighted interpolation (exponential with exponent 2 which had the lowest RMS) and assumed national parks and state land had land values of zero to reflect actual cost to the State Government.
-LVChange <- read.csv("input/table/landval_change.csv", header = TRUE) # increase in land values fromm 2012 to 2019 for each LGA as sourced from https://www.data.qld.gov.au/dataset/historical-trends-in-land-valuations/resource/03f430d3-de9b-44ba-bc8b-a147ad00c080
+LVChange <- read.csv("input/table/landval_change.csv", header = TRUE) # increase in land values from 2012 to 2019 for each LGA as sourced from https://www.data.qld.gov.au/dataset/historical-trends-in-land-valuations/resource/03f430d3-de9b-44ba-bc8b-a147ad00c080
 LandVal <- to_raster(as.data.frame(LandVal)$lvalsimf * (as.data.frame(lgasfact) %>% left_join(LVChange, by = c("lgas" = "LGA")))$Change + 1, lu2016) # increase land values by the increase in unimproved land values between 2012 and 2019
 
 # apply names
@@ -893,11 +881,11 @@ names(KadaLR) <- "KadaLR"
 names(HabKpa) <- "HabKpa"
 names(HabNotKpa) <- "HabNotKpa"
 names(RestKpa) <- "RestKpa"
-names(RestNotKpa) <- "restNotKpa"
+names(RestNotKpa) <- "RestNotKpa"
 names(Pda) <- "Pda"
-names(PdaInv) <- "PdaInv"
 names(Kra) <- "Kra"
-names(KraInv) <- "KraInv"
+names(Kbha) <- "Kbha"
+names(Sda) <- "Sda"
 names(LandVal) <- "LandVal"
 
 ## SET UP AND RUN SCENARIOS

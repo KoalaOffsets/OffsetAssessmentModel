@@ -60,7 +60,7 @@ to_predict <- function (coeff, newdata.df) {
 
 # to mask stacked raster according to LU1999 land classes code (lucode)
 to_mask  <- function(lumap, lucode, stack.dummy) {
-  funselect <- function(x) { x[ x !=lucode] <- NA; return(x) } #extract only non existing land use (53 hi res urb)so that existing functional land uses are not 	randomized. Set everything else to NA
+  funselect <- function(x) { x[ x !=lucode] <- NA; return(x) } #extract only non existing land use (53 hi res urb) so that existing functional land uses are not randomized. Set everything else to NA
   vacants   <- calc(lumap, funselect)
   tp.masked <- mask( stack.dummy, vacants) #new raster with value of x, except for the cells that are NA on mask.
   return (tp.masked)
