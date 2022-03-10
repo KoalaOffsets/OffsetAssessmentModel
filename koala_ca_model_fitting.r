@@ -39,11 +39,6 @@ if (!require("R.matlab")) install.packages("R.matlab"); library("R.matlab")
 if (!require("foreign"))  install.packages("foreign") ; library("foreign")
 if (!require("raster"))   install.packages("raster")  ; library("raster")
 
-## 2. SPECIFY WORKING FOLDER  ===================
-#setwd("XXX")
-
-##__2.1 -- Load sampling points. OBSELETE. 20/11/2018 MATLAB ####
-
 ##__2.2 -- Load coefficients table ####
 
 luLabel <- c(21,22,23,40,51,52,53,60,71,72)

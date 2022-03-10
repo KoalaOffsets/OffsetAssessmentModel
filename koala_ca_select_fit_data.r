@@ -38,7 +38,6 @@ library("dplyr")
 library("raster")
 library("rJava")
 library("raster")
-library("RNetLogo")
 library("nnet")
 library("grDevices")
 library("diffeR")
@@ -111,11 +110,6 @@ to_get_mode <- function(x) {
   ux[which.max(tabulate(match(x, ux)))]
 }
 
-## 3. LOAD WORKING MAPS =================================================
-
-##__3.1 -- Set working directory if needed
-# setwd("XXX")
-
 ##__3.2 -- Load working maps ####
 lu1999 <- raster("input/maps/landuse99reclsuburb4.asc")
 lu2016 <- raster("input/maps/landuse16reclsuburb4.asc")
@@ -130,9 +124,7 @@ water_dataset[is.na(lu1999)] <- NA # remove zeros outside the study area
 clay_dataset <- raster("input/maps/seq_clymeans1.asc")
 neighUrb_dataset <- raster("input/maps/lu99rdevn1.asc") # proportion of residential dev (51,52,53) in a 5 x 5 moving window (ignoring NAs)
 neighInd_dataset <- raster("input/maps/lu99indn1.asc") # proportion of commercial and industrial (60,72) in a 5 x 5 moving window (ignoring NAs)
-urbanFootprint <- raster("input/maps/seq_urbanfootprint2017.asc") # [0:regional 40:rural 50:urban]
-plan2010 <- raster("input/maps/seq_planning_scheme_2010.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$planning_scheme_2010 for description
-plan2017 <- raster("input/maps/seq_planning_scheme_2017b.asc") #04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description
+urbanFootprint <- raster("input/maps/seq_urbanfootprint2006fin.asc") # [0:regional 40:rural 50:urban]
 lgas <- raster("input/maps/lgas.asc") # LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan]
 
 # set data frame names
@@ -148,8 +140,6 @@ names(clay_dataset) <- ("cly")
 names(neighUrb_dataset) <- ("NeighUrb")
 names(neighInd_dataset) <- ("NeighInd")
 names(urbanFootprint) <- ("UF")
-names(plan2010) <- ("plan2010")
-names(plan2017) <- ("plan2017")
 names(lgas) <- ("lgas")
 
 MacroVar <- as.data.frame(stack(lu1999,
@@ -164,8 +154,6 @@ MacroVar <- as.data.frame(stack(lu1999,
                                   neighUrb_dataset,
                                   neighInd_dataset,
                                   urbanFootprint,
-                                  plan2010,
-                                  plan2017,
                                   lgas))
 
 # Get land use data into data frames type and calculate frequencies
@@ -190,8 +178,6 @@ remove(lu1999,
        neighUrb_dataset,
        neighInd_dataset,
        urbanFootprint,
-       plan2010,
-       plan2017,
        lgas)
 gc()
 
@@ -221,8 +207,6 @@ stackMacroVar.df$cly[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999
 stackMacroVar.df$NeighUrb[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
 stackMacroVar.df$NeighInd[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
 stackMacroVar.df$UF[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
-stackMacroVar.df$plan2010[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
-stackMacroVar.df$plan2017[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
 stackMacroVar.df$lgas[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
 
 ## 4. SAMPLING POINTS SELECTION =====================================================
