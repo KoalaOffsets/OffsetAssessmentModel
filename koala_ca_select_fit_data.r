@@ -124,7 +124,7 @@ water_dataset[is.na(lu1999)] <- NA # remove zeros outside the study area
 clay_dataset <- raster("input/maps/seq_clymeans1.asc")
 neighUrb_dataset <- raster("input/maps/lu99rdevn1.asc") # proportion of residential dev (51,52,53) in a 5 x 5 moving window (ignoring NAs)
 neighInd_dataset <- raster("input/maps/lu99indn1.asc") # proportion of commercial and industrial (60,72) in a 5 x 5 moving window (ignoring NAs)
-urbanFootprint <- raster("input/maps/seq_urbanfootprint2006fin.asc") # [0:regional 40:rural 50:urban]
+urbanFootprint <- raster("input/maps/seq_urbanfootprint_2006fin.asc") # [0:regional 40:rural 50:urban]
 lgas <- raster("input/maps/lgas.asc") # LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan]
 
 # set data frame names

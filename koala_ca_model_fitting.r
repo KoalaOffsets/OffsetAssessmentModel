@@ -59,8 +59,8 @@ for (i in 1:length(luLabel)){
   macroVar$LCfact <- factor(macroVar$lu2016)
   macroVar$UFfact <- factor(macroVar$UF)
   macroVar$lgasfact <- factor(macroVar$lgas)
-  macroVar$plan2010fact <- factor(macroVar$plan2010)
-  macroVar$plan2017fact <- factor(macroVar$plan2017)
+  #macroVar$plan2010fact <- factor(macroVar$plan2010)
+  #macroVar$plan2017fact <- factor(macroVar$plan2017)
 
   macroVar$LCsort <- relevel(macroVar$LCfact, ref = "51") # set the reference level to 51
 

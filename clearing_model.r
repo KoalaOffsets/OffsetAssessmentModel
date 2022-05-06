@@ -1,13 +1,13 @@
-# required packages
+# CODE TO FIT THE CLEARING MODEL
+
+# clear objects in workspace
+rm(list=ls())
+gc()
+
+# load packages
 library(foreign)
 library(data.table)
 library(tidyverse)
-
-rm(list=ls())
-if(!is.null(dev.list())) dev.off()
-
-## Set working directory
-#setwd("XXX")
 
 # load data
 ClearData <- read.dbf("input/clearing/forest_cleared_grid.dbf")
@@ -38,6 +38,3 @@ for (i in levels(ClearData$LU99fact)) {
 # save predictions
 save(Models, file = "input/clearing/models/clearing_models.Rda")
 save(ClearPred, file = "input/clearing/models/clearing_predictions.Rda")
-
-# plot predictions
-ggplot(Predictions, aes(x = LU16, y = PROB)) + geom_bar(stat="identity", colour = "red", fill = "red") + ylab("Estimated proportion woody vegetation cleared") + xlab("Land-use in 2016") + theme_bw() + theme(axis.text.x = element_text(size = 10, angle = 90, vjust = 0.5, hjust = 1), axis.text.y = element_text(size = 10)) + scale_y_continuous(breaks=c(0, 1)) + facet_wrap(LU99 ~ ., labeller = label_value, scale = "fixed")

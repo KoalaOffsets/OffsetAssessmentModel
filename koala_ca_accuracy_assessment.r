@@ -84,7 +84,7 @@ awc[is.na(lu1999)] <- NA # remove zeros outside the study area
 cly <- raster("input/maps/seq_clymeans1.asc") # soil clay content
 NeighUrb <- raster("input/maps/lu99rdevn1.asc") # proportion of residential dev (51,52,53) in a 5 x 5 moving window (ignoring NAs)
 NeighInd <- raster("input/maps/lu99indn1.asc") # proportion of commercial and industrial (60,72) in a 5 x 5 moving window (ignoring NAs)
-UFfact <- raster("input/maps/seq_urbanfootprint2017.asc") # [0:regional 40:rural 50:urban] from Shaping SEQ
+UFfact <- raster("input/maps/seq_urbanfootprint_2006fin.asc") # [0:regional 40:rural 50:urban] from Shaping SEQ
 UFfacttb <- read.csv("input/table/shapingseq_cons.csv", header = TRUE) # Shaping SEQ land uses
 lgasfact <- raster("input/maps/lgas.asc") # LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan]
 
