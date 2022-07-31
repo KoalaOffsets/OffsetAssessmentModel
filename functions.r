@@ -1,5 +1,41 @@
 # FUNCTIONS
 
+# function to calculate mode
+Mode <- function(x) {
+    ux <- unique(x)
+    ux=ux[!is.na(ux)]
+    ux[which.max(tabulate(match(x, ux)))]
+}
+
+# function to arrange shared legend for multi-plots
+grid_arrange_shared_legend <- function(..., ncol = length(list(...)), nrow = 1, position = c("bottom", "right")) {
+  plots <- list(...)
+  position <- match.arg(position)
+  g <- ggplotGrob(plots[[1]] + theme(legend.position = position))$grobs
+  legend <- g[[which(sapply(g, function(x) x$name) == "guide-box")]]
+  lheight <- sum(legend$height)
+  lwidth <- sum(legend$width)
+  gl <- lapply(plots, function(x) x + theme(legend.position="none"))
+  gl <- c(gl, ncol = ncol, nrow = nrow)
+
+  combined <- switch(position,
+                     "bottom" = arrangeGrob(do.call(arrangeGrob, gl),
+                                            legend,
+                                            ncol = 1,
+                                            heights = unit.c(unit(1, "npc") - lheight, lheight)),
+                     "right" = arrangeGrob(do.call(arrangeGrob, gl),
+                                           legend,
+                                           ncol = 2,
+                                           widths = unit.c(unit(1, "npc") - lwidth, lwidth)))
+
+  grid.newpage()
+  grid.draw(combined)
+
+  # return gtable invisibly
+  invisible(combined)
+
+  }
+
 # function to set transition to zero based on land transitions that are not possible for all cells
 set_trans_zero <- function(Preds, ClassesNotPoss) {
 # Preds in the predicted probabilities
@@ -21,6 +57,13 @@ to_raster <- function(df, rast_template) {
   extent(NewRast) <- extent(rast_template)
   projection(NewRast) <- projection(rast_template)
   return(NewRast)
+}
+
+# function to create a cross tabulation based on two raster maps with categorical values (does not need to have the same number of classes)
+# columns are observed, rows are predicted
+to_crosstab <- function (obs, pred, rast_template) {
+  ctable <- crosstabm(to_raster(pred, rast_template), to_raster(obs, rast_template))
+  return (ctable)
 }
 
 # function to allocate offset sites for proponent driven offsets
@@ -824,7 +867,7 @@ RunOffSim <- function(TablesSim, RastersSim, ModelsSim, ParamsSim) {
   }
   names(OffSiteP) <- "OffSiteP"
   names(OffSiteF) <- "OffSiteF"
-  # third choice offset site locations - anywhere in restoration areas not in a KPA (Section 2A.4 of the Offset Policy -  close as possible to impact site and KPA)
+  # third choice offset site locations - anywhere in restoration areas not in or in a KPA (Section 2A.4 of the Offset Policy -  close as possible to impact site and KPA)
   OffSitePB <- RestNotKpa * TenurePrivate # areas for offset sites outside or inside of KPAs for proponent driven offsets
   # check if national parks and state land available for financial offsets
   if (NPSLAvail == TRUE) {
@@ -1063,7 +1106,7 @@ RunOffSim <- function(TablesSim, RastersSim, ModelsSim, ParamsSim) {
       Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables] * UFCons[which(lucurr.df$lucurr == x), Variables] * TargetCons[which(lucurr.df$lucurr == x), Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
     }
 
-    # set transitions that are not possible to zero
+    # set transitions that are considered not possible to zero
     # assume the following rules
     # 1. Rural residential (40) cannot transition to grazing (21), crops (22), or transition (23)
     # 2. Low density urban (51) cannot transition to rural residential (40), grazing (21), crops (22), or transition (23)
@@ -1140,6 +1183,7 @@ RunOffSim <- function(TablesSim, RastersSim, ModelsSim, ParamsSim) {
       KoalaTreeLostOff.df$KoalaTreeLost[!which((ImpOff.df == 1) & ((ProtKRA.df == 1) & (LUChange.df[,"lunew"] == "60")) & ((ImpOffKRA.df == 1) & (LUChange.df[,"lunew"] != "60")))] <- 0
       # add areas that were not offset in previous iterations
       KoalaTreeLostOff.df$KoalaTreeLost <- KoalaTreeLostOff.df$KoalaTreeLost + OffsetImpactSitesNotAlloc.df$OffsetImpactSitesNotAlloc
+
       # get the opportunities and back-up opportunities for the amount of koala habitat that could be restored in places that are in the permitted restoration areas and are of land uses 10, 21, 22, 23, 30, 40 for proponent drive and financial offsets
 
       # proponent driven offsets

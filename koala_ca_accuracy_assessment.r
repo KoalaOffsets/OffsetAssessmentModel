@@ -1,19 +1,9 @@
-## Input: land cover 1999 and 2016; macro factors, MLR coefficients
-## Analysis:
-## Author: Agung Wahyudi & Jonathan Rhodes
-## Date first created: 06/08/2018
-##
-## About the ca model:
-## The initial structure of the ca model
-## was inspired by simlander/apolus.
-## Different to simlander, current ca model
-## takes into account multiple-change pathways
-## Modification: "removal of sample points of less than 2" on cross-tab
+# CODE TO RUN THE ACCURACY ASSESSMENT FOR THE CA MODEL
 
-## land use codes used
+# land use codes used
 
 # 10	Conservation
-# 21	Grazing native vegetation
+# 21	Grazing
 # 22	Cropping and modified pasture
 # 23	Other agricultural
 # 30	Forestry
@@ -21,21 +11,16 @@
 # 51	Low-density urban residential
 # 52	Medium-density urban residential
 # 53	High-density urban residential
-# 60	Intensive urban area
+# 60	Services, utilities, mining
 # 71	Intensive agriculture
 # 72	Industrial
-# 80	water
+# 80	Water
 
-## 0. START ============================================================
-
+# clear objects in workspace
 rm(list=ls())
-if(!is.null(dev.list())) dev.off()
+gc()
 
-## Set working directory
-#setwd("XXX")
-
-## 1. CHECKING AND INSTALLING REQUIRED PACKAGES ========================
-
+# load pacakges
 library(tidyverse)
 library(raster)
 library(nnet)
@@ -46,32 +31,12 @@ library(foreach)
 library(doParallel)
 library(vcd)
 
-## 2. FUNCTIONS =====================================================
+# load functions
+source("functions.r")
 
-# function to create raster from data frame
-to_raster <- function(df, rast_template) {
-  NewRast <- raster(t(matrix(df, ncol = dim(rast_template)[1], nrow = dim(rast_template)[2])))
-  extent(NewRast) <- extent(rast_template)
-  projection(NewRast) <- projection(rast_template)
-  return(NewRast)
-}
+# set up data
 
-# to create a cross tabulation based on two raster maps with categorical values (does not need to have similar amount of classes)
-# columns are observed, rows are predicted
-to_crosstab <- function (obs, pred, rast_template) {
-  ctable <- crosstabm(to_raster(pred, rast_template), to_raster(obs, rast_template))
-  return (ctable)
-}
-
-Mode <- function(x) {
-    ux <- unique(x)
-    ux=ux[!is.na(ux)]
-    ux[which.max(tabulate(match(x, ux)))]
-  }
-
-## SET UP DATA
-
-## Load maps, data, and lookup tables ####
+# load maps, data, and lookup tables
 lu1999 <- raster("input/maps/landuse99reclsuburb4.asc") # land use in 1999
 lu2016 <- raster("input/maps/landuse16reclsuburb4.asc") # land use 2016
 slope <- raster("input/maps/slpfinal1.asc") # slope
@@ -107,12 +72,12 @@ names(lgasfact) <- "lgasfact"
 Predictors <- as.data.frame(stack(c(slope, elev, road, city, roadDen, awc, cly, NeighUrb, NeighInd, UFfact, lgasfact)))
 # scale data the same way that they are scaled in the fitting process
 Predictors <- Predictors %>% mutate_at(c("slope", "elev", "road", "city", "roadDen", "awc", "cly", "NeighUrb", "NeighInd"), ~(scale(.)))
-# convert to factors
+# convert categorical variables to factors
 Predictors$UFfact <- as.factor(Predictors$UFfact)
 Predictors$lgasfact <- as.factor(Predictors$lgasfact)
 
 # get transition probability models
-luLabel <- c(21,22,23,40,51,52,53,60,71,72)
+luLabel <- c(21, 22, 23, 40, 51, 52, 53, 60, 71, 72)
 luLabelList <- list()
 TMods <- list()
 for (i in 1:length(luLabel)){
@@ -123,7 +88,7 @@ for (i in 1:length(luLabel)){
 }
 
 # set up current land use
-lucurr <- lu1999 ##set current land use
+lucurr <- lu1999 # set current land use
 lu1999.df <- as.data.frame(lu1999) # land use in data from format
 lu2016.df <- as.data.frame(lu2016) # land use in data from format
 lucurr.df <- lu1999.df # set current land use as a data frame
@@ -131,13 +96,14 @@ names(lucurr) <- "lucurr"
 names(lu1999.df) <- "lucurr"
 names(lucurr.df) <- "lucurr"
 
-MaxIter <- 100
-# current land use raster
+# set number of replicates
+Iter <- 100
+
+# create list to hold predicted land-uses
 LandUsePredList <- list()
 
 #loop through iterations to run simulation
-
-for (i in 1:MaxIter) {
+for (i in 1:Iter) {
   Predictions <- lapply(luLabelList, FUN = function(x){Pred <- as.data.frame(stats::predict(TMods[[which(luLabel == x)]], newdata = Predictors[which(lucurr.df$lucurr == x),], type = "probs", se = TRUE, na.action = na.exclude)); Variables <- dimnames(Pred)[[2]][which(!dimnames(Pred)[[2]] == as.character(x))]; Pred[, Variables] <- Pred[, Variables]; Sums <- rowSums(Pred); Pred <- Pred / Sums; return(Pred)})
 
   # simulate transitions
@@ -145,7 +111,7 @@ for (i in 1:MaxIter) {
   NewLUTemp <- unlist(lapply(Predictions, FUN = function(y) {apply(y, 1, FUN = function(x) {if (any(is.na(x))) {NA} else {as.integer(names(x)[which(rmultinom(1, 1, x) == 1)])}})}))
   NewLU.df$lucurr[as.integer(names(NewLUTemp[which(!is.na(NewLUTemp))]))] <- NewLUTemp[which(!is.na(NewLUTemp))]
 
-  # record new land use in list
+  # record new land-uses in list
   LandUsePredList[[i]] <- NewLU.df
 }
 
@@ -154,7 +120,7 @@ saveRDS(lu1999.df, "sim_results/accuracy_assessment/lu1999.rds")
 saveRDS(lu2016.df, "sim_results/accuracy_assessment/lu2016.rds")
 saveRDS(LandUsePredList,"sim_results/accuracy_assessment/predictions.rds")
 
-# read in simulations
+# read in simulations if necessary
 Past <- readRDS("sim_results/accuracy_assessment/lu1999.rds")
 Current <- readRDS("sim_results/accuracy_assessment/lu2016.rds")
 Simulated <- readRDS("sim_results/accuracy_assessment/predictions.rds")
@@ -168,7 +134,7 @@ for (i in 1:length(Simulated)){
   }
 }
 
-# get the model of the simulations
+# get the mode of the simulated land-uses
 SimMode <- calc(SimStack, fun = Mode)
 
 # create error matrix based on the modal land use of the simulations

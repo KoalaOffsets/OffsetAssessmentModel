@@ -20,8 +20,7 @@
 rm(list=ls())
 gc()
 
-# Load pacakges
-
+# load pacakges
 library(tidyverse)
 library(raster)
 library(nnet)
@@ -59,7 +58,7 @@ Rasters$NeighUrb <- raster("input/maps/lu16rdevn1.asc") # proportion of resident
 Rasters$NeighInd <- raster("input/maps/lu16indn1.asc") # proportion of commercial and industrial (60,72) in a 5 x 5 moving window (ignoring NAs)
 Rasters$UFfact <- raster("input/maps/seq_urbanfootprint_2017fin.asc") # [0:regional 40:rural 50:urban] Shaping SEQ
 Rasters$lgasfact <- raster("input/maps/lgas.asc") # LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan]
-Rasters$LGAExistUrb <- raster("input/maps/lgaexisturb.asc") # LGAs and whether existing urban areas or not 1 = LGA 1 not urban, 2 = LGA 1 urban, ...., 15 = LGA 8 not urban, 16 = LGA 8 urban. LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan] & existing urban areas as defined in Shaping SEQ [1 = existing urban area, 0 = not existing urban area]
+Rasters$LGAExistUrb <- raster("input/maps/lgaexisturb.asc") # LGAs and whether existing urban areas or not 1 = LGA 1 expansion, 2 = LGA 1 consolidation, ...., 15 = LGA 8 expansion, 16 = LGA 8 consolidation. LGAs for the study region for defining dwelling growth targets [1 = Moreton Bay, 2 = Noosa, 3 = Redland, 4 = Sunshine Coast, 5 = Brisbane, 6 = Gold Coast, 7 = Ipswich, 8 = Logan] & existing urban areas as defined in Shaping SEQ [1 = existing urban area, 0 = not existing urban area]
 Rasters$HabHM <- raster("input/maps/habhm.asc") # High to medium core habitat area - HSM rules 351, 341, 331, 350, 340, 330
 Rasters$HabML <- raster("input/maps/habml.asc") # Medium to low core habitat area - HSM rules 251, 241, 231
 Rasters$HabVL <- raster("input/maps/habvl.asc") # Very low core habitat area - HSM rules 250, 240, 230
@@ -73,7 +72,7 @@ Rasters$HabNonCorePre <- raster("input/maps/habncp.asc") # Non-core habitat area
 Rasters$KDen <- raster("input/maps/denmod6f.asc") # koala density from Model 6 (Rhodes et al. 2015)
 Rasters$KadaBOU <- raster("input/maps/kadabnurbf.asc") # koala habitat protected - bushland habitat in KADA area outside of the urban footprint and outside of urban use (urban use defined as classes 4, 36, 18, 10, 20, 23, 26, 27, 12, 2, 3, 14, 19, 1, 29, 13, 17, 22, 39, 6 in the 2017 planning scheme)
 Rasters$PKadaB <- raster("input/maps/pkadabf.asc") # koala habitat protected - bushland habitat in PKADA
-Rasters$KadaBHMR <- raster("input/maps/kadabhmrf.asc") # koala habitat impacts to be offset (if not already protected)- all koala bushland habitat and high and medium values rehab
+Rasters$KadaBHMR <- raster("input/maps/kadabhmrf.asc") # koala habitat impacts to be offset (if not already protected) - all koala bushland habitat and high and medium values rehab
 Rasters$KadaHMR <- raster("input/maps/kadahmrf.asc") # areas suitable for offsets - all high and medium values rehab
 Rasters$KadaLR <- raster("input/maps/kadalrf.asc") # back-up areas suitable for offsets - all low value rehab
 Rasters$HabKpa <- raster("input/maps/habkpaf.asc") # habitat in koala priority areas
@@ -88,9 +87,9 @@ Rasters$Kra <- raster("input/maps/krafin.asc") # koala habitat not protected nor
 Rasters$Kbha <- raster("input/maps/kbhafin.asc") # koala habitat not protected, but offsets required - Koala Broad Hectare Areas
 Rasters$Sda <- raster("input/maps/sdafin.asc") # State Development Areas
 Rasters$LandVal <- raster("input/maps/landval.asc") # unimproved land value from 2012 (QVAS data). Here have estimated missing or zero values using an inverse distance weighted interpolation (exponential with exponent 2 which had the lowest RMS) and assumed national parks and state land have land values of zero. This is used to estimate the incentive payment actually required for an offset site at a particular location.
-Rasters$LandVal <- to_raster(as.data.frame(Rasters$LandVal)$landval * (as.data.frame(Rasters$lgasfact) %>% left_join(Tables$LVChangetb, by = c("lgas" = "LGA")))$Change + 1, Rasters$lu2016) # increase land values by the increase in unimproved land values between 2012 and 2021
+Rasters$LandVal <- to_raster((as.data.frame(Rasters$LandVal)$layer * (as.data.frame(Rasters$lgasfact) %>% left_join(Tables$LVChangetb, by = c("layer" = "LGA")))$Change) + 1, Rasters$lu2016) # increase land values by the increase in unimproved land values between 2012 and 2021
 Rasters$FinIncent <- raster("input/maps/finincent.asc") # financial incentive payment per hectare for each LGA for cost of financial offsets calculation (taken from Queensland Environmental Offsets Policy v1.1 2021 =- Table 4.5.3)
-Rasters$TenurePrivate <- raster("input/maps/tenfhll.asc") # private freehold and leasehold land (Based on most common tenure in each grid) - used to define land available to developers for offset sites
+Rasters$TenurePrivate <- raster("input/maps/tenfhll.asc") # private freehold and leasehold land (Based on most common tenure in each grid) - used to define land potentially available to developers for offset sites
 Rasters$TenurePrivateState <- raster("input/maps/tenfhllnpsl.asc") # private freehold and leasehold land, plus national parks and state lands (Based on most common tenure in each grid) - used to define land potentially available to State Government for offset sites
 
 # apply names to rasters
@@ -148,7 +147,7 @@ load("input/clearing/models/clearing_predictions.Rda")
 Models$ClearPred <- ClearPred
 rm(ClearPred)
 # land-use transition probability model
-luLabel <- c(21,22,23,40,51,52,53,60,71,72)
+luLabel <- c(21, 22, 23, 40, 51, 52, 53, 60, 71, 72)
 luLabelList <- list()
 TMods <- list()
 for (i in 1:length(luLabel)){
@@ -169,11 +168,11 @@ rm(TMods)
 ValuesConsol <- c(100, 75, 50)
 ValuesReg <- c(FALSE, TRUE)
 ValuesOff <- c("none", "proponent", "financialhab", "financialkoala")
-ValuesAvail <- c(100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 5, 1)
+ValuesAvail <- c(100, 90, 80, 70, 60, 50, 40, 30, 20, 17.5, 15, 12.5 10, 7.5 5, 2.5, 1)
 ValuesNPS <- c(FALSE, TRUE)
 
 # set up parallel processing
-cl <- makeCluster(10)  # initiate parallel computing, set to the number of our cores
+cl <- makeCluster(10)  # initiate parallel computing, set to the number of cores
 registerDoParallel(cl)  # use multicore
 
 for (i in ValuesConsol) {
@@ -217,7 +216,7 @@ for (i in ValuesConsol) {
           Params$PercAvail <- 100 # percent of potential offset sites available
           Params$RestSucc <- 1 # probability that restoration is successful in the long run
           Params$OnGroundCostHa <- 20000 # on-ground cost per hectare restored (used for proponent driven and financial offsets)
-          Params$PercAdminCost <- 25 # administration costs as percentage of on-ground costs
+          Params$PercAdminCost <- 25 # administration costs as percentage of on-ground costs (used for proponent driven and financial offsets)
           Params$MaxFinCost <- 230000 # maximum cost per impact hectare for financial offsets
 
           foreach (s = 1:10, .packages = c("tidyverse", "raster", "nnet", "tictoc")) %dopar% {
@@ -242,7 +241,7 @@ for (i in ValuesConsol) {
               Params$PercAvail <- l # percent of potential offset sites available
               Params$RestSucc <- 1 # probability that restoration is successful in the long run
               Params$OnGroundCostHa <- 20000 # on-ground cost per hectare restored (used for proponent driven and financial offsets)
-              Params$PercAdminCost <- 25 # administration costs as percentage of on-ground costs
+              Params$PercAdminCost <- 25 # administration costs as percentage of on-ground costs (used for proponent driven and financial offsets)
               Params$MaxFinCost <- 230000 # maximum cost per impact hectare for financial offsets
 
               foreach (s = 1:10, .packages = c("tidyverse", "raster", "nnet", "tictoc")) %dopar% {

@@ -1,37 +1,26 @@
-## Analysis:
-## Author: Agung Wahyudi (modified by Jonathan Rhodes)
-## Date first created: 20/11/2018
-##
-## About the ca model:
-## The initial structure of the ca model
-## was inspired by simlander/apolus.
-## Different to simlander, current ca model
-## takes into account multiple-change pathways
-##
-## This is a translation from MATLAB \Quant_analysis\subUrb_macroVar2.m
+# CODE TO PREPARE DATA TO FIT CA MODEL
 
-## land use codes used
+# land use codes used
 
 # 10	Conservation
-# 21	Grazing native vegetation
+# 21	Grazing
 # 22	Cropping and modified pasture
-# 23	Transition land
+# 23	Other agricultural
 # 30	Forestry
 # 40	Rural residential
 # 51	Low-density urban residential
 # 52	Medium-density urban residential
 # 53	High-density urban residential
-# 60	Commercial
+# 60	Services, utilities, mining
 # 71	Intensive agriculture
 # 72	Industrial
 # 80	Water
 
-## 0. START ============================================================
-
+# clear objects in workspace
 rm(list=ls())
-if(!is.null(dev.list())) dev.off()
+gc()
 
-## 1. CHECKING AND INSTALLING REQUIRED PACKAGES ========================
+# load pacakges
 
 library("tidyr")
 library("dplyr")
@@ -42,75 +31,10 @@ library("nnet")
 library("grDevices")
 library("diffeR")
 
-## 2. FUNCTIONS =====================================================
+# load functions
+source("functions.r")
 
-# input df
-to_raster <- function(df.dummy) {
-  mat.dummy             <- raster(t(matrix(df.dummy, ncol = 2359, nrow = 1152)))
-  extent(mat.dummy)     <- extent(sa4)
-  projection(mat.dummy) <- projection(lu1999)
-  return(mat.dummy)
-}
-
-# stats::predict, use lapply
-to_predict <- function (coeff, newdata.df) {
-  stats::predict(coeff, newdata = newdata.df, type = "probs", se = TRUE)
-}
-
-# to mask stacked raster according to LU1999 land classes code (lucode)
-to_mask  <- function(lumap, lucode, stack.dummy) {
-  funselect <- function(x) { x[ x !=lucode] <- NA; return(x) } #extract only non existing land use (53 hi res urb) so that existing functional land uses are not randomized. Set everything else to NA
-  vacants   <- calc(lumap, funselect)
-  tp.masked <- mask( stack.dummy, vacants) #new raster with value of x, except for the cells that are NA on mask.
-  return (tp.masked)
-}
-
-# to rank using base::rank.
-to_rank   <- function(x) {
-  rank(-x, na.last = TRUE, ties.method =  "random")
-}
-
-# to select n-th (ludemand)  cells from x -> as land use demand
-to_select <- function(x, ludemand) {
-  x[x > ludemand] <- NA; return(x)
-}
-
-# to run simulation. Remove commented lines #, when saving the plot is required
-to_simulate_mp <- function (lucode, tprank){
-  for (i in 1:yearLength){
-    urbdemand1  <- urbdemand[lucode] + annualdemand[lucode]*i
-    testX       <- to_select(tprank, urbdemand1)
-    #filen       <- paste("output/20180904/lu", lucode, "_", i, ".png", sep="")
-
-    #png(filename = paste(filen),width = 1200, height = 1600, bg="white")
-    plot(to_raster(testX), breaks=breakpoints,col=colors)
-    #dev.off()
-
-    print(paste(1999 + i,  "with land demand of", urbdemand1))
-  }
-}
-
-to_count_cutOff <- function (cutOff, datamap) {
-  dataDummy <- as.data.frame(datamap)
-  z     <- dataDummy >= cutOff
-  sumZ  <- sum(z, na.rm=TRUE)
-  return (sumZ)
-}
-
-to_zero_one <- function (datasetDummy) {
-  minDummy <- min(as.matrix(datasetDummy), na.rm = TRUE)
-  maxDummy <- max(as.matrix(datasetDummy), na.rm = TRUE)
-  if (minDummy < 0) {minDummy=0}
-  converted_dataset <- (datasetDummy - minDummy)/(maxDummy - minDummy)
-  return (converted_dataset)
-}
-
-to_get_mode <- function(x) {
-  ux <- unique(x)
-  ux[which.max(tabulate(match(x, ux)))]
-}
-
-##__3.2 -- Load working maps ####
+# load spatial data
 lu1999 <- raster("input/maps/landuse99reclsuburb4.asc")
 lu2016 <- raster("input/maps/landuse16reclsuburb4.asc")
 # Independent variables
@@ -142,6 +66,7 @@ names(neighInd_dataset) <- ("NeighInd")
 names(urbanFootprint) <- ("UF")
 names(lgas) <- ("lgas")
 
+# create data frame stack
 MacroVar <- as.data.frame(stack(lu1999,
                                   lu2016,
                                   slope_dataset,
@@ -156,13 +81,13 @@ MacroVar <- as.data.frame(stack(lu1999,
                                   urbanFootprint,
                                   lgas))
 
-# Get land use data into data frames type and calculate frequencies
+# get land use data into data frames type and calculate frequencies
 lu1999.df <- as.data.frame(lu1999)
 lu2016.df <- as.data.frame(lu2016)
 freq1999 <- as.data.frame(freq(lu1999))
 freq2016 <- as.data.frame(freq(lu2016))
 
-# Get zero map
+# get zero map
 tp.zero <- lu1999 - lu1999
 
 # remove original variables to save memory
@@ -181,10 +106,9 @@ remove(lu1999,
        lgas)
 gc()
 
-## __3.3 -- Conversion of factors to [0 1] , stacked, and df converted ########
+# standardise continuous variables
 
 stackMacroVar.df <- MacroVar
-
 stackMacroVar.df$slope <- scale(MacroVar$slope)
 stackMacroVar.df$elev <- scale(MacroVar$elev)
 stackMacroVar.df$road <- scale(MacroVar$road)
@@ -209,11 +133,9 @@ stackMacroVar.df$NeighInd[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$l
 stackMacroVar.df$UF[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
 stackMacroVar.df$lgas[((stackMacroVar.df$lu1999 == 10) | (stackMacroVar.df$lu1999 == 80) | (stackMacroVar.df$lu1999 == 30) | (stackMacroVar.df$lu2016 == 10) | (stackMacroVar.df$lu2016 == 80) | (stackMacroVar.df$lu2016 == 30))] <- NA
 
-## 4. SAMPLING POINTS SELECTION =====================================================
-
+## save data in format ready for fitting CA model
 luLabel <- c(21,22,23,40,51,52,53,60,71,72)
-
-for (i in 1:length(luLabel)){
+for (i in 1:length(luLabel)) {
   print(i)
   mlr_Dummy.df <- stackMacroVar.df %>%
     filter(lu1999 == luLabel[i])
