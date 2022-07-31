@@ -19,4 +19,4 @@ This contains the R code for a spatial simulation model to assess offset policie
 - parameterise the land-use change model by running in this order: koala_ca_select_fit_data.r (data preparation), koala_ca_model_fitting.r (model fitting), koala_ca_accuracy_assesment.r (accrancy assessment)
 - parameterise the habitat clearing model running: clearing_model.r
 - assess offset policies through forward simulations by running: koala_ca_forward.r
-- generate figurea and table by running: figures_code.r
+- generate figures and tables by running: figures_code.r
