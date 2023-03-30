@@ -338,7 +338,7 @@ for (j in 1:10) {
 saveRDS(Grid, "figures/sims_grid.rds")
 
 # load grid of results if necessary
-Grid <- read_rds("figures/sims_grid.rds")
+#Grid <- read_rds("figures/sims_grid.rds")
 
 Summary_Mean <- Grid %>% group_by(LandAvail, DevScenario, OffType) %>% summarise(NoOffCore = mean(NoOffCore, na.rm = TRUE), OffCore = mean(OffCore, na.rm = TRUE), NoOffNonCore = mean(NoOffNonCore, na.rm = TRUE), OffNonCore = mean(OffNonCore, na.rm = TRUE), NoOffTotal = mean(NoOffTotal, na.rm = TRUE), OffTotal = mean(OffTotal, na.rm = TRUE), NoOffK = mean(NoOffK, na.rm = TRUE), OffK = mean(OffK, na.rm = TRUE), OffvsNoOffCore = mean(OffvsNoOffCore, na.rm = TRUE), OffvsNoOffNonCore = mean(OffvsNoOffNonCore, na.rm = TRUE), OffvsNoOffTotal = mean(OffvsNoOffTotal, na.rm = TRUE), OffvsNoOffK = mean(OffvsNoOffK, na.rm = TRUE), OffCost = mean(OffCost, na.rm = TRUE), CostEffTotal = mean(CostEffTotal, na.rm = TRUE), CostEffKoala = mean(CostEffKoala, na.rm = TRUE))
 
@@ -474,11 +474,11 @@ for (i in 1:10) {
 OffsetsFinKoala100Avail100 <- Res / 10
 writeRaster(OffsetsFinKoala100Avail100, "figures/maps/offsets_finkoala_100avail_100.asc", format = "ascii", overwrite=TRUE)
 
+# create figures
+
 # create data for graphs
 GraphData <- Summary_Mean %>% dplyr::select(DevScenario, LandAvail, OffType, OffCore, OffNonCore, OffTotal, OffK, OffCost, CostEffTotal, CostEffKoala) %>% mutate(DevScenario = as.factor(DevScenario))
 GraphDataNoOff <- Summary_Mean_NoOff %>% dplyr::select(DevScenario, NoOffCore, NoOffNonCore, NoOffTotal, NoOffK) %>% mutate(DevScenario = as.factor(DevScenario))
-
-# create figures
 
 # Figure 1 - study area map - figure created in ArcGIS -see ArcGIS Pro project "/figures/maps/maps.aprx"
 
@@ -489,7 +489,7 @@ GraphDataNoOff <- Summary_Mean_NoOff %>% dplyr::select(DevScenario, NoOffCore, N
 
 ggthemr("flat")
 
-GraphDataNoOff %>% dplyr::select(-NoOffTotal) %>% pivot_longer(!DevScenario, names_to = "Indicator", values_to = "Change") %>% mutate(Indicator = as_factor(Indicator)) %>% ggplot(aes(fill = Indicator, y = Change, x = DevScenario)) + geom_bar(position = "dodge", stat = "identity") + scale_fill_discrete(labels = c("Core habitat area", "Non-core habitat area", "Koala abundance")) + ylab("Percent change") + xlab("Development scenario (percent consolidation)") + ggtitle("Habitat Area and Koala Abundance Change with no Offsets") + theme(plot.title = element_text(hjust = 0.5, size = 22), legend.position = "bottom", axis.text = element_text(size = 22), axis.title = element_text(size = 22), legend.text = element_text(size = 22), legend.title=element_blank()) + labs(fill = "Indicator:")
+GraphDataNoOff %>% mutate(DevScenario = recode_factor(DevScenario, "50" = "High expansion", "75" = "Medium expansion", "100" = "Low expansion")) %>% dplyr::select(-NoOffTotal) %>% pivot_longer(!DevScenario, names_to = "Indicator", values_to = "Change") %>% mutate(Indicator = as_factor(Indicator)) %>% ggplot(aes(fill = Indicator, y = Change, x = DevScenario)) + geom_bar(position = "dodge", stat = "identity") + scale_fill_discrete(labels = c("Core habitat area", "Non-core habitat area", "Koala abundance")) + ylab("Percent change") + xlab("Development scenario") + ggtitle("Habitat Area and Koala Abundance Change with no Offsets") + theme(plot.title = element_text(hjust = 0.5, size = 22), legend.position = "bottom", axis.text = element_text(size = 22), axis.title = element_text(size = 22), legend.text = element_text(size = 22), legend.title=element_blank()) + labs(fill = "Indicator:")
 
 ggsave("figures/fig3_graph.jpg", dpi = 300, height = 10, width = 10)
 
@@ -497,7 +497,7 @@ ggsave("figures/fig3_graph.jpg", dpi = 300, height = 10, width = 10)
 
 ggthemr("flat")
 
-new_labels <- c("50" = "50% consolidation", "75" = "75% consolidation", "100" = "100% consolidation")
+new_labels <- c("50" = "High expansion", "75" = "Medium expansion", "100" = "Low expansion")
 
 GraphData %>% ggplot(aes(x = LandAvail, y = OffTotal, group = OffType, color = OffType)) + facet_grid(. ~ DevScenario, labeller = labeller(DevScenario = new_labels)) + geom_point() + geom_line() + ylab("Percent change in total habitat area") + xlab("Percent offset site availability") + ggtitle("Habitat Area Change") + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom") + labs(color = "Offset mechanism:") + scale_color_discrete(labels = c("Developer-led", "Agency-led (habitat)", "Agency-led (abundance)"))
 
@@ -507,7 +507,7 @@ ggsave("figures/fig4.jpg", dpi = 300)
 
 ggthemr("flat")
 
-new_labels <- c("50" = "50% consolidation", "75" = "75% consolidation", "100" = "100% consolidation")
+new_labels <- c("50" = "High expansion", "75" = "Medium expansion", "100" = "Low expansion")
 
 GraphData %>% ggplot(aes(x = LandAvail, y = OffK, group = OffType, color = OffType)) + facet_grid(. ~ DevScenario, labeller = labeller(DevScenario = new_labels)) + geom_point() + geom_line() + ylab("Percent change in koala abundance") + xlab("Percent offset site availability") + ggtitle("Koala Abundance Change") + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom") + labs(color = "Offset mechanism:") + scale_color_discrete(labels = c("Developer-led", "Agency-led (habitat)", "Agency-led (abundance)"))
 
@@ -517,7 +517,7 @@ ggsave("figures/fig5.jpg", dpi = 300)
 
 ggthemr("flat")
 
-new_labels <- c("50" = "50% consolidation", "75" = "75% consolidation", "100" = "100% consolidation")
+new_labels <- c("50" = "High expansion", "75" = "Medium expansion", "100" = "Low expansion")
 
 GraphData %>% ggplot(aes(x = LandAvail, y = OffCost, group = OffType, color = OffType)) + facet_grid(. ~ DevScenario, labeller = labeller(DevScenario = new_labels)) + geom_point() + geom_line() + ylab("Total offset costs ($ millions)") + xlab("Percent offset site availability") + ggtitle("Offset Costs") + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom") + labs(color = "Offset mechanism:") + scale_color_discrete(labels = c("Developer-led", "Agency-led (habitat)", "Agency-led (abundance)"))
 
@@ -525,13 +525,13 @@ ggsave("figures/fig6.jpg", dpi = 300)
 
 # Figure S1 - potential koala density - figure created in ArcGIS - see ArcGIS Pro project "/figures/maps/maps.aprx"
 
-# Figure S2 - rules for the models of regulation and offset requirements - - figure created in Powerpoint -see Powerpoint file "/figures/maps/figures.pptx"
+# Figure S2 - rules for the models of regulation and offset requirements - figure created in Powerpoint -see Powerpoint file "/figures/maps/figures.pptx"
 
 # Figure S3 - offset habitat core
 
 ggthemr("flat")
 
-new_labels <- c("50" = "50% consolidation", "75" = "75% consolidation", "100" = "100% consolidation")
+new_labels <- c("50" = "High expansion", "75" = "Medium expansion", "100" = "Low expansion")
 
 GraphData %>% ggplot(aes(x = LandAvail, y = OffCore, group = OffType, color = OffType)) + facet_grid(. ~ DevScenario, labeller = labeller(DevScenario = new_labels)) + geom_point() + geom_line() + ylab("Percent change in core habitat area") + xlab("Percent offset site availability") + ggtitle("Core Habitat Area Change") + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom") + labs(color = "Offset mechanism:") + scale_color_discrete(labels = c("Developer-led", "Agency-led (habitat)", "Agency-led (abundance)"))
 
@@ -541,7 +541,7 @@ ggsave("figures/figs3.jpg", dpi = 300)
 
 ggthemr("flat")
 
-new_labels <- c("50" = "50% consolidation", "75" = "75% consolidation", "100" = "100% consolidation")
+new_labels <- c("50" = "High expansion", "75" = "Medium expansion", "100" = "Low expansion")
 
 GraphData %>% ggplot(aes(x = LandAvail, y = OffNonCore, group = OffType, color = OffType)) + facet_grid(. ~ DevScenario, labeller = labeller(DevScenario = new_labels)) + geom_point() + geom_line() + ylab("Percent change in non-core habitat area") + xlab("Percent offset site availability") + ggtitle("Non-core Habitat Area Change") + theme(plot.title = element_text(hjust = 0.5), legend.position = "bottom") + labs(color = "Offset mechanism:") + scale_color_discrete(labels = c("Developer-led", "Agency-led (habitat)", "Agency-led (abundance)"))
 
