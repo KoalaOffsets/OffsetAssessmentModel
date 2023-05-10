@@ -905,7 +905,6 @@ RunOffSim <- function(TablesSim, RastersSim, ModelsSim, ParamsSim) {
   OffsetSitesIter[!is.na(OffsetSitesIter)] <- NA
   names(OffsetSitesIter) <- "OffsetSitesIter"
 
-
   # compile land-use change predictors into a data frame
   Predictors <- as.data.frame(stack(c(slope, elev, road, city, roadDen, awc, cly, NeighUrb, NeighInd, UFfact, lgasfact)))
   # scale data the same way that they are scaled in the fitting process

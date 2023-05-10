@@ -45,7 +45,7 @@ Tables$LVChangetb <- read.csv("input/tables/landval_change.csv", header = TRUE) 
 Rasters <- list()
 Rasters$luarea <- raster("input/maps/luarea.asc") # 1 ha grids defining the study area
 Rasters$lu2016 <- raster("input/maps/landuse16reclsuburb4.asc") # land use 2016
-Rasters$plan2017 <- raster("input/maps/seq_planning_scheme_2017b.asc") # see: 04 Model\CA-KoalaOffset\output\table\Land_reclassification.xlsx$seq_planningScheme2017b for description - planning schemes for 2017
+Rasters$plan2017 <- raster("input/maps/seq_planning_scheme_2017b.asc") # planning schemes for 2017
 Rasters$slope <- raster("input/maps/slpfinal1.asc") # slope
 Rasters$elev <- raster("input/maps/demfinal.asc") # elevation
 Rasters$road <- raster("input/maps/SEQ_distRoad.asc") # distance to main roads
@@ -63,12 +63,12 @@ Rasters$HabHM <- raster("input/maps/habhm.asc") # High to medium core habitat ar
 Rasters$HabML <- raster("input/maps/habml.asc") # Medium to low core habitat area - HSM rules 251, 241, 231
 Rasters$HabVL <- raster("input/maps/habvl.asc") # Very low core habitat area - HSM rules 250, 240, 230
 Rasters$HabCore <- Rasters$HabHM + Rasters$HabML + Rasters$HabVL # Total core habitat area
-Rasters$HabNonCore <- raster("input/maps/habnc.asc") # Non-core habitat area - HSM rules 151, 150, 141, 146, 131, 130, 321, 320, 221, 220, 121
+Rasters$HabNonCore <- raster("input/maps/habnc.asc") # Non-core habitat area - HSM rules 151, 150, 141, 140, 131, 130, 321, 320, 221, 220, 121
 Rasters$HabHMPre <- raster("input/maps/habhmp.asc") # High to medium core habitat area pre-clearing - HSM rules 351, 341, 331, 350, 340, 330
 Rasters$HabMLPre <- raster("input/maps/habmlp.asc") # Medium to low core habitat area pre-clearing - HSM rules 251, 241, 231
 Rasters$HabVLPre <- raster("input/maps/habvlp.asc") # Very low core habitat area pre-clearing - HSM rules 250, 240, 230
 Rasters$HabCorePre <- Rasters$HabHMPre + Rasters$HabMLPre + Rasters$HabVLPre # Total core habitat area pre-clearing
-Rasters$HabNonCorePre <- raster("input/maps/habncp.asc") # Non-core habitat area pre-clearing - HSM rules 151, 150, 141, 146, 131, 130, 321, 320, 221, 220, 121
+Rasters$HabNonCorePre <- raster("input/maps/habncp.asc") # Non-core habitat area pre-clearing - HSM rules 151, 150, 141, 140, 131, 130, 321, 320, 221, 220, 121
 Rasters$KDen <- raster("input/maps/denmod6f.asc") # koala density from Model 6 (Rhodes et al. 2015)
 Rasters$KadaBOU <- raster("input/maps/kadabnurbf.asc") # koala habitat protected - bushland habitat in KADA area outside of the urban footprint and outside of urban use (urban use defined as classes 4, 36, 18, 10, 20, 23, 26, 27, 12, 2, 3, 14, 19, 1, 29, 13, 17, 22, 39, 6 in the 2017 planning scheme)
 Rasters$PKadaB <- raster("input/maps/pkadabf.asc") # koala habitat protected - bushland habitat in PKADA
