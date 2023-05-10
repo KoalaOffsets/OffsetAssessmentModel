@@ -17,7 +17,7 @@ This contains the R code for a spatial simulation model to assess offset policie
 ## Instructions
 
 - copy code to working directory
-- create the following directories in the working directory: /input, /sim_results, /sim_results/accuracy_assessment, /figures
+- create the following directories in the working directory: /input, /sim_results, /sim_results/accuracy_assessment, /figures, /figures/maps
 - copy input data to the /input directory
 - parameterise the land-use change model by running in this order: koala_ca_select_fit_data.r (data preparation), koala_ca_model_fitting.r (model fitting), koala_ca_accuracy_assesment.r (accrancy assessment)
 - parameterise the habitat clearing model by running: clearing_model.r
